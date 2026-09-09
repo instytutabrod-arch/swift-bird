@@ -1,0 +1,32 @@
+{
+  "name": "Swift-bird",
+  "short_name": "Swift-bird",
+  "description": "Szkolna nauka 500 angielskich słów z wymową, pisownią i egzaminami.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#12294F",
+  "theme_color": "#12294F",
+  "lang": "pl",
+  "categories": ["education", "kids"],
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

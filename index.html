@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#12294F">
+  <meta name="description" content="Swift-bird – szkolna aplikacja do nauki angielskich słów.">
+  <title>Swift-bird</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <section id="s-login" class="screen auth-screen on">
+    <div class="auth-card">
+      <div class="brand brand-large">
+        <svg class="bird" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50,19 C52.6,25 53.6,33 53.0,43 L55.4,71 L50,63 L44.6,71 L47.0,43 C46.4,33 47.4,25 50,19 Z" fill="currentColor"/><path d="M48.2,36 C36,37 20.5,44 8,63 C21,50.5 35,44.5 49.2,44.8 Z" fill="currentColor"/><path d="M51.8,36 C64,37 79.5,44 92,63 C79,50.5 65,44.5 50.8,44.8 Z" fill="currentColor"/></svg>
+        <strong>Swift-bird</strong>
+      </div>
+      <h1>Witaj!</h1>
+      <p class="lead">Wpisz swoje dane i rozpocznij naukę.</p>
+      <form id="studentLogin" class="form-stack">
+        <label>Imię<input id="loginFirstName" name="firstName" autocomplete="given-name" maxlength="40" required></label>
+        <label>Pierwsza litera nazwiska<input id="loginLastInitial" name="lastInitial" autocomplete="off" maxlength="1" required></label>
+        <label>PIN<input id="loginPin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" minlength="4" maxlength="4" pattern="[0-9]{4}" required></label>
+        <p id="loginError" class="form-error" role="alert"></p>
+        <button class="primary" type="submit">Zaloguj się</button>
+      </form>
+      <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
+      <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
+      <p class="version-label">Wersja 10.2</p>
+    </div>
+  </section>
+
+  <section id="s-register" class="screen auth-screen">
+    <div class="auth-card">
+      <button id="backFromRegister" class="back-button" type="button">← Powrót</button>
+      <div class="brand brand-small">
+        <svg class="bird" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50,19 C52.6,25 53.6,33 53.0,43 L55.4,71 L50,63 L44.6,71 L47.0,43 C46.4,33 47.4,25 50,19 Z" fill="currentColor"/><path d="M48.2,36 C36,37 20.5,44 8,63 C21,50.5 35,44.5 49.2,44.8 Z" fill="currentColor"/><path d="M51.8,36 C64,37 79.5,44 92,63 C79,50.5 65,44.5 50.8,44.8 Z" fill="currentColor"/></svg>
+        <strong>Swift-bird</strong>
+      </div>
+      <h1>Nowe konto</h1>
+      <p class="lead">Wymyśl swój PIN i zapamiętaj go. Będzie potrzebny przy każdym logowaniu.</p>
+      <form id="studentRegister" class="form-stack">
+        <label>Imię<input id="regFirstName" name="firstName" autocomplete="given-name" maxlength="40" required></label>
+        <label>Pierwsza litera nazwiska<input id="regLastInitial" name="lastInitial" autocomplete="off" maxlength="1" required></label>
+        <label>Wymyśl PIN, 4 cyfry<input id="regPin" name="pin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="4" pattern="[0-9]{4}" required></label>
+        <label>Powtórz PIN<input id="regPinRepeat" name="pinRepeat" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="4" pattern="[0-9]{4}" required></label>
+        <p id="registerError" class="form-error" role="alert"></p>
+        <button class="primary" type="submit">Załóż konto i zacznij</button>
+      </form>
+      <p class="fine-print">Nikt nie odzyska za ciebie zapomnianego PIN-u. Nowy może wygenerować tylko administrator.</p>
+    </div>
+  </section>
+
+  <section id="s-admin-login" class="screen auth-screen">
+    <div class="auth-card">
+      <button id="backToStudentLogin" class="back-button" type="button">← Powrót</button>
+      <div class="brand brand-small">
+        <svg class="bird" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50,19 C52.6,25 53.6,33 53.0,43 L55.4,71 L50,63 L44.6,71 L47.0,43 C46.4,33 47.4,25 50,19 Z" fill="currentColor"/><path d="M48.2,36 C36,37 20.5,44 8,63 C21,50.5 35,44.5 49.2,44.8 Z" fill="currentColor"/><path d="M51.8,36 C64,37 79.5,44 92,63 C79,50.5 65,44.5 50.8,44.8 Z" fill="currentColor"/></svg>
+        <strong>Swift-bird</strong>
+      </div>
+      <h1>Panel administratora</h1>
+      <form id="adminLogin" class="form-stack">
+        <label>Hasło administratora<input id="adminPassword" type="password" autocomplete="current-password" required></label>
+        <p id="adminLoginError" class="form-error" role="alert"></p>
+        <button class="primary" type="submit">Zaloguj się</button>
+      </form>
+      <p class="version-label">Wersja 10.1</p>
+    </div>
+  </section>
+
+  <section id="s-home" class="screen app-screen">
+    <header class="app-header">
+      <div class="brand brand-inline">
+        <svg class="bird" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50,19 C52.6,25 53.6,33 53.0,43 L55.4,71 L50,63 L44.6,71 L47.0,43 C46.4,33 47.4,25 50,19 Z" fill="currentColor"/><path d="M48.2,36 C36,37 20.5,44 8,63 C21,50.5 35,44.5 49.2,44.8 Z" fill="currentColor"/><path d="M51.8,36 C64,37 79.5,44 92,63 C79,50.5 65,44.5 50.8,44.8 Z" fill="currentColor"/></svg>
+        <strong>Swift-bird</strong>
+      </div>
+      <div class="user-area"><span id="studentName"></span><button id="studentLogout" class="small-button" type="button">Wyloguj</button></div>
+    </header>
+    <main class="content">
+      <div id="syncStatus" class="sync-status" aria-live="polite"></div>
+      <section class="welcome-row">
+        <div><p class="eyebrow">Twoja nauka</p><h1 id="welcomeName">Cześć!</h1></div>
+        <div class="streak"><b id="streakN">0</b><small>dni z rzędu</small></div>
+      </section>
+      <section class="overview" aria-label="Postępy">
+        <div><b id="allCollected">0</b><span>z 500 słów</span></div>
+        <div><b id="passedN">0</b><span>zdanych egzaminów</span></div>
+        <div><b id="openN">1</b><span>otwartych sekcji</span></div>
+      </section>
+      <div class="section-heading"><div><p class="eyebrow">25 etapów</p><h2>Sekcje słówek</h2></div><p>Każda sekcja zawiera 20 słów. Zbierz je i zdaj egzamin, aby otworzyć kolejną.</p></div>
+      <div id="sectionsGrid" class="sections-grid"></div>
+    </main>
+  </section>
+
+  <section id="s-section" class="screen app-screen">
+    <header class="simple-header"><button id="sectionBack" class="back-button" type="button">← Sekcje</button><span id="sectionNumber"></span></header>
+    <main class="content narrow">
+      <div class="section-title"><span id="sectionIcon" class="section-icon"></span><div><p class="eyebrow" id="sectionEyebrow"></p><h1 id="sectionTitle"></h1><p id="sectionProgress"></p></div></div>
+      <div id="wordGrid" class="word-grid"></div>
+      <div id="sectionAction" class="action-panel"></div>
+    </main>
+  </section>
+
+  <section id="s-play" class="screen app-screen">
+    <header class="simple-header"><span id="playSectionName"></span><button id="quit" class="small-button" type="button">Zakończ</button></header>
+    <main class="content narrow">
+      <div class="bar"><i id="barFill"></i></div>
+      <div id="stage"></div>
+    </main>
+  </section>
+
+  <section id="s-done" class="screen app-screen">
+    <main class="content narrow done">
+      <div class="done-mark">✓</div>
+      <h1 id="doneTitle">Dobra robota!</h1>
+      <div class="overview done-stats">
+        <div><b id="dNew">0</b><span>nowe słowa</span></div>
+        <div><b id="dOk">0</b><span>trafione</span></div>
+        <div><b id="dSection">0</b><span>z 20 zebranych</span></div>
+      </div>
+      <div id="dList" class="new-list"></div>
+      <div id="doneAction"></div>
+      <button id="doneBack" class="secondary wide" type="button">Wróć do sekcji</button>
+    </main>
+  </section>
+
+  <section id="s-exam" class="screen app-screen">
+    <header class="simple-header"><button id="examQuit" class="back-button" type="button">← Sekcja</button><span id="examSectionName"></span></header>
+    <main class="content exam-content">
+      <div class="exam-top"><div><p class="eyebrow">Egzamin końcowy</p><h1 id="examTitle"></h1></div><div class="round-pill" id="examRound">Runda 1 z 4</div></div>
+      <p class="exam-instruction">Kliknij obrazek, a potem pasujące słowo. Każdy element możesz odsłuchać.</p>
+      <div class="exam-progress"><i id="examProgress"></i></div>
+      <p id="examFeedback" class="exam-feedback" aria-live="assertive"></p>
+      <div id="matchBoard" class="match-board">
+        <div><h2>Obrazki</h2><div id="examImages" class="match-column"></div></div>
+        <div><h2>Słowa</h2><div id="examWords" class="match-column"></div></div>
+      </div>
+      <div id="examComplete" class="exam-complete" hidden></div>
+    </main>
+  </section>
+
+  <section id="s-admin" class="screen admin-screen">
+    <header class="admin-header">
+      <div><p class="eyebrow">Swift-bird</p><h1>Panel administratora</h1></div>
+      <button id="adminLogout" class="small-button" type="button">Wyloguj</button>
+    </header>
+    <main class="admin-content">
+      <section class="admin-card create-card">
+        <div><p class="eyebrow">Nowe konto</p><h2>Dodaj ucznia</h2><p>System wygeneruje jednorazowo 4-cyfrowy PIN.</p></div>
+        <form id="createStudent" class="create-form">
+          <label>Imię<input id="newFirstName" maxlength="40" required></label>
+          <label>Litera nazwiska<input id="newLastInitial" maxlength="1" required></label>
+          <button class="primary" type="submit">Utwórz konto</button>
+        </form>
+      </section>
+      <section id="credentialsCard" class="credentials-card" hidden>
+        <div><p class="eyebrow">Dane logowania – zapisz teraz</p><h2 id="credentialsName"></h2></div>
+        <div class="pin-box"><span>PIN</span><b id="credentialsPin"></b></div>
+        <div class="credential-actions"><button id="copyCredentials" class="secondary" type="button">Kopiuj</button><button id="printCredentials" class="secondary" type="button">Drukuj</button></div>
+        <p>Po zamknięciu tej informacji PIN nie będzie możliwy do odczytania. W razie potrzeby można wygenerować nowy.</p>
+      </section>
+      <section class="admin-card students-card">
+        <div class="admin-list-head"><div><p class="eyebrow">Uczniowie</p><h2>Konta i postępy</h2></div><button id="refreshStudents" class="secondary" type="button">Odśwież</button></div>
+        <p id="adminError" class="form-error" role="alert"></p>
+        <div class="table-wrap">
+          <table><thead><tr><th>Uczeń</th><th>Słowa</th><th>Sekcja</th><th>Egzaminy</th><th>Ostatnia aktywność</th><th></th></tr></thead><tbody id="studentsBody"></tbody></table>
+        </div>
+        <div id="studentsEmpty" class="empty-state" hidden>Nie ma jeszcze kont uczniów.</div>
+      </section>
+    </main>
+  </section>
+
+  <script src="./words.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
