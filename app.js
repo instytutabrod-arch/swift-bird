@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '10.3';
+const APP_VERSION = '10.4';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -183,13 +183,66 @@ let voice = null;
 let speechToken = 0;
 let recognition = null;
 
+/* Kobiece glosy angielskie w systemach, na ktorych aplikacja realnie chodzi.
+   Interfejs przegladarki nie udostepnia pola z plcia glosu, wiec jedynym
+   sposobem jest rozpoznanie po nazwie. */
+const FEMALE_VOICES=[
+  // Android i Chrome
+  'google uk english female','google us english','google english female',
+  // Apple
+  'samantha','serena','kate','karen','moira','tessa','fiona','ava','allison','susan','victoria','zoe','nicky','siri female',
+  // Windows
+  'zira','hazel','sonia','aria','jenny','michelle','libby','emma','eva','catherine','linda','heera'
+];
+const MALE_VOICES=['male','daniel','alex','fred','oliver','tom','rishi','aaron','arthur','george','james','david','mark','guy','ryan','brian','gordon','lee','rocko','junior','ralph','albert','bad news','bahh','bells','boing','bubbles','cellos','jester','organ','superstar','trinoids','whisper','wobble','zarvox'];
+
+/* Dopasowanie po calych slowach, nie po fragmentach. Bez tego "male"
+   trafialoby w "Google UK English Female", a "lee" w "Kathleen". */
+function hasWord(name,token){
+  return new RegExp('\\b'+token.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(name);
+}
+function voiceScore(item){
+  const name=(item.name||'').toLowerCase();
+  const lang=(item.lang||'').replace('_','-').toLowerCase();
+  const female=hasWord(name,'female');
+  let score=0;
+  if(!female && MALE_VOICES.some(token=>hasWord(name,token))) score-=1000;
+  if(female) score+=200;
+  if(FEMALE_VOICES.some(token=>name.includes(token))) score+=140;
+  // Brytyjski akcent brzmi dla polskiego ucha wyrazniej w krotkich slowach.
+  if(lang==='en-gb') score+=30;
+  else if(lang==='en-us') score+=24;
+  else if(lang.startsWith('en-')) score+=10;
+  // Glosy sieciowe sa zwykle lepszej jakosci, ale wymagaja internetu.
+  if(item.localService===false) score+=6;
+  if(item.default) score+=3;
+  return score;
+}
+
 function pickVoice(){
   if(!hasTTS) return;
   let voices=[];
   try{ voices=window.speechSynthesis.getVoices() || []; }catch(error){}
   const tag=item=>(item.lang||'').replace('_','-').toLowerCase();
   const english=voices.filter(item=>tag(item)==='en' || tag(item).startsWith('en-'));
-  voice=english.find(item=>item.default) || english.find(item=>tag(item)==='en-us') || english.find(item=>tag(item)==='en') || english[0] || null;
+  if(!english.length){ voice=null; return; }
+  const ranked=english.slice().sort((a,b)=>voiceScore(b)-voiceScore(a));
+  voice=ranked[0];
+  updateVoiceInfo();
+}
+
+/* Nazwa wybranego glosu, do sprawdzenia w panelu administratora.
+   Jesli system ma tylko glos meski, zadne sortowanie tego nie naprawi
+   i trzeba doinstalowac dane glosowe. */
+function updateVoiceInfo(){
+  const element=document.getElementById('voiceInfo');
+  if(!element) return;
+  if(!hasTTS){ element.textContent='Ta przeglądarka nie ma syntezatora mowy.'; return; }
+  if(!voice){ element.textContent='System nie ma głosu angielskiego. Doinstaluj dane głosowe: Ustawienia, Tekst na mowę, silnik Google, English.'; return; }
+  const name=(voice.name||'').toLowerCase();
+  const looksFemale=hasWord(name,'female')||FEMALE_VOICES.some(token=>name.includes(token));
+  element.textContent='Głos: '+voice.name+' ('+voice.lang+'). '+
+    (looksFemale?'Rozpoznany jako kobiecy.':'Nie udało się rozpoznać kobiecego głosu. Doinstaluj dane głosowe English (United Kingdom) w ustawieniach systemu.');
 }
 if(hasTTS){
   pickVoice();
@@ -207,7 +260,7 @@ function stopSpeech(){
 
 function makeUtterance(text){
   const utterance=new SpeechSynthesisUtterance(text);
-  utterance.lang=voice?voice.lang:'en-US'; utterance.rate=.82; utterance.pitch=1.03; utterance.volume=1;
+  utterance.lang=voice?voice.lang:'en-GB'; utterance.rate=.80; utterance.pitch=1.12; utterance.volume=1;
   if(voice) utterance.voice=voice;
   return utterance;
 }
@@ -593,8 +646,10 @@ function selectMatch(kind,card,button){
   const feedback=$('#examFeedback');
   if(correct){
     examMatched.add(card.id);selectedImage.button.classList.add('matched');selectedWord.button.classList.add('matched');
-    feedback.textContent='Good';feedback.className='exam-feedback good';
-    speakSequence([card.en,'Good'],()=>{
+    // Bez pochwaly przy trafionej parze: na egzaminie liczy sie rytm,
+    // a powtarzane "Good" dwadziescia razy tylko wydluza rundy.
+    feedback.textContent='';feedback.className='exam-feedback';
+    speakSequence([card.en],()=>{
       selectedImage=null;selectedWord=null;examBusy=false;
       $('#examProgress').style.width=((examRoundIndex*5+examMatched.size)/20*100)+'%';
       if(examMatched.size===5)setTimeout(advanceExam,450);
@@ -627,7 +682,7 @@ function advanceExam(){
 /* ==================== PANEL ADMINISTRATORA ==================== */
 let lastCredentials=null;
 
-async function enterAdmin(){testMode=false;$('#testBanner').hidden=true;show('admin');await renderStudents();}
+async function enterAdmin(){testMode=false;$('#testBanner').hidden=true;pickVoice();updateVoiceInfo();show('admin');await renderStudents();}
 
 /* Wejscie w tryb testowy. Stan startowy jest lokalny i pusty, zadne
    /api/progress nie jest wolane, wiec konta uczniow pozostaja nietkniete. */
@@ -690,6 +745,7 @@ $('#studentRegister').addEventListener('submit',async event=>{
 /* Przycisk pojawia sie tylko wtedy, gdy serwer dopuszcza samodzielna rejestracje. */
 api('/api/config').then(config=>{ if(config&&config.selfRegistration)$('#openRegister').hidden=false; }).catch(()=>{});
 $('#openTestMode').addEventListener('click',enterTestMode);
+$('#testVoice').addEventListener('click',()=>{pickVoice();say('Hello. This is your English voice.');});
 $('#leaveTestMode').addEventListener('click',()=>{stopSpeech();clearTimeout(advanceTimer);enterAdmin();});
 $('#openAdminLogin').addEventListener('click',()=>show('admin-login'));
 $('#backToStudentLogin').addEventListener('click',()=>show('login'));

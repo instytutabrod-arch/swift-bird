@@ -92,3 +92,44 @@ test('postęp nigdy nie jest zapisywany dla roli innej niż uczeń', () => {
   // klikanie w nim nie zapisze niczego na koncie ucznia.
   assert.match(app, /function saveProgress\(\)\{[\s\S]{0,120}currentUser\.role !== 'student'\) return;/);
 });
+
+test('dobór głosu odrzuca głosy męskie i premiuje kobiece', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const start = app.indexOf('const FEMALE_VOICES=');
+  const end = app.indexOf('function pickVoice()');
+  assert.ok(start !== -1 && end > start, 'brak modułu doboru głosu');
+  const score = new Function(app.slice(start, end) + '\nreturn voiceScore;')();
+
+  const rank = list => list.slice().sort((a, b) => score(b) - score(a))[0].name;
+
+  // Samsung Tab z Chrome: oba głosy Google obok siebie.
+  assert.equal(rank([
+    {name: 'Google UK English Male', lang: 'en-GB'},
+    {name: 'Google UK English Female', lang: 'en-GB'}
+  ]), 'Google UK English Female');
+
+  // macOS: głos domyślny bywa męski, samo pole default nie może decydować.
+  assert.equal(rank([
+    {name: 'Alex', lang: 'en-US', default: true},
+    {name: 'Samantha', lang: 'en-US'}
+  ]), 'Samantha');
+
+  // Windows
+  assert.equal(rank([
+    {name: 'Microsoft David - English (United States)', lang: 'en-US'},
+    {name: 'Microsoft Hazel - English (Great Britain)', lang: 'en-GB'}
+  ]), 'Microsoft Hazel - English (Great Britain)');
+
+  // Głos męski musi mieć wynik ujemny, żeby nigdy nie wygrał przez sam akcent.
+  assert.ok(score({name: 'Daniel', lang: 'en-GB'}) < 0);
+  assert.ok(score({name: 'Google UK English Female', lang: 'en-GB'}) > 0);
+});
+
+test('trafiona para na egzaminie nie wywołuje pochwały', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  // Wypowiadane jest samo słowo, bez "Good".
+  assert.match(app, /speakSequence\(\[card\.en\],\(\)=>\{/);
+  assert.doesNotMatch(app, /speakSequence\(\[card\.en,'Good'\]/);
+  // Komunikat przy błędzie zostaje, bo to informacja, nie pochwała.
+  assert.match(app, /feedback\.textContent='Try again'/);
+});

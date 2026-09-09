@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = 'swift-bird-v10-3';
+const VERSION = 'swift-bird-v10-4';
 const SHELL = [
   './',
   './index.html',

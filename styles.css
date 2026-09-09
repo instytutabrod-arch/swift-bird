@@ -103,3 +103,5 @@ input:focus{border-color:var(--ink-soft)}
 }
 .skip-test:active{background:rgba(255,201,74,.14)}
 #examSkip{text-align:center}
+
+.voice-info{margin:14px 0 10px;font-size:.82rem;line-height:1.6;color:var(--muted)}

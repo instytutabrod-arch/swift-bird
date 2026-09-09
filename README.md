@@ -1,4 +1,4 @@
-# Swift-bird — wersja 10.3
+# Swift-bird — wersja 10.4
 
 Szkolna aplikacja internetowa do nauki angielskich słów. Uczniowie logują się
 bez adresu e-mail: imieniem, pierwszą literą nazwiska i indywidualnym
@@ -12,9 +12,10 @@ urządzeniach po zalogowaniu na to samo konto.
 - nowe słowo wymaga jednej poprawnej próby wymowy, a następnie ręcznego
   wpisania poprawnego słowa spośród czterech podpowiedzi;
 - po poprawnym wpisaniu aplikacja odtwarza słowo i losową angielską pochwałę;
+- na egzaminie trafiona para odtwarza samo słowo, bez pochwały;
 - po zebraniu 20 słów uczeń zdaje egzamin: 4 rundy po 5 par;
-- egzamin ma dwie kolumny — piktogramy i słowa — a oba elementy można
-  odsłuchać; poprawna para mówi `Good`, błędna `Try again`;
+- egzamin ma dwie kolumny, piktogramy i słowa, a oba elementy można
+  odsłuchać; poprawna para odtwarza samo słowo, błędna mówi `Try again`;
 - dopiero zdany egzamin odblokowuje następną sekcję;
 - panel administratora tworzy konta, pokazuje postępy i generuje nowy PIN;
 - panel ma tryb testowy: przejście całej ścieżki ucznia z pominięciem
@@ -57,6 +58,21 @@ Jeżeli rozpakowany katalog na Macu nazywa się `swift-bird-v10.1`, użyj jego p
 
 Po wdrożeniu otwórz `/`, wybierz **Panel administratora**, zaloguj się hasłem z
 `ADMIN_PASSWORD`, utwórz pierwszego ucznia i zapisz wygenerowany PIN.
+
+## Głos
+
+Aplikacja sama wybiera kobiecy głos angielski z tych, które ma system.
+Interfejs przeglądarki nie udostępnia informacji o płci głosu, więc jedyną
+drogą jest rozpoznanie po nazwie. Punktacja premiuje znane głosy kobiece
+(Google UK English Female, Samantha, Hazel, Karen, Sonia), odrzuca męskie
+i lekko preferuje akcent brytyjski. Dopasowanie działa na całych słowach,
+bo inaczej fragment `male` trafiałby w nazwę `Female`.
+
+Wybrany głos widać w panelu administratora, w karcie **Diagnostyka**, razem
+z przyciskiem **Posłuchaj głosu**. Jeśli panel pokazuje, że kobiecego głosu
+nie znaleziono, żadne sortowanie tego nie naprawi: trzeba doinstalować dane
+głosowe w systemie, na Androidzie przez Ustawienia, Tekst na mowę, silnik
+Google, English (United Kingdom).
 
 ## Tryb testowy
 
