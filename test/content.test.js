@@ -60,3 +60,35 @@ test('manifest i pamięć PWA używają nazwy Swift-bird oraz nie cacheują API'
   assert.match(app,new RegExp("const APP_VERSION = '"+pkg.version.split('.').slice(0,2).join('.')+"';"));
   assert.match(worker,/pathname\.startsWith\('\/api\/'\)/);
 });
+
+test('tryb testowy jest dostępny tylko dla sesji administratora', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+
+  // Warunkiem jest rola 'admin', a nie sama flaga, wiec podmiana zmiennej
+  // w konsoli przez ucznia nie wystarczy do wlaczenia pomijania.
+  assert.match(app, /function inTestMode\(\)\{ return testMode && currentUser && currentUser\.role==='admin'; \}/);
+
+  // Przyciski pomijania powstaja tylko w trybie testowym, w trzech miejscach:
+  // wymowa, wpisywanie i runda egzaminu.
+  const skips = app.match(/inTestMode\(\)/g) || [];
+  assert.ok(skips.length >= 6, 'zbyt mało miejsc sprawdzających tryb testowy: ' + skips.length);
+  assert.match(app, /if\(inTestMode\(\)\) mic\.append\(makeSkip\('Pomiń wymowę'/);
+  assert.match(app, /if\(inTestMode\(\)\) stage\.append\(makeSkip\('Pomiń wpisywanie'/);
+
+  // Wejscie tylko z panelu i tylko dla admina.
+  assert.match(app, /function enterTestMode\(\)\{\s*if\(!currentUser\|\|currentUser\.role!=='admin'\)return;/);
+  // Wejscie w panel gasi tryb, zeby nie zostal wlaczony po powrocie.
+  assert.match(app, /async function enterAdmin\(\)\{testMode=false;/);
+
+  // Przycisk uruchamiajacy tryb istnieje wylacznie w ekranie administratora.
+  const adminSection = html.slice(html.indexOf('id="s-admin"'), html.indexOf('id="s-exam"') > html.indexOf('id="s-admin"') ? html.length : html.length);
+  assert.ok(adminSection.includes('id="openTestMode"'), 'przycisk trybu testowego poza panelem administratora');
+});
+
+test('postęp nigdy nie jest zapisywany dla roli innej niż uczeń', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  // To jest druga, niezalezna zapora: nawet gdyby tryb testowy przeciekl,
+  // klikanie w nim nie zapisze niczego na koncie ucznia.
+  assert.match(app, /function saveProgress\(\)\{[\s\S]{0,120}currentUser\.role !== 'student'\) return;/);
+});

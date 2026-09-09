@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '10.2';
+const APP_VERSION = '10.3';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -166,6 +166,7 @@ function grade(id,correct){
 function sectionCollected(index){ return SECTIONS[index].cards.filter(card=>seen(card.id)).length; }
 function sectionPassed(index){ return S.passedExams.includes(SECTIONS[index].id); }
 function openSectionCount(){
+  if(inTestMode()) return SECTIONS.length;
   let count=1;
   for(let i=0;i<SECTIONS.length-1;i++){
     if(sectionCollected(i)===20 && sectionPassed(i)) count=i+2;
@@ -289,6 +290,12 @@ function listen(target,callback){
 
 /* ==================== STRONA UCZNIA ==================== */
 let currentSectionIndex=0;
+/* Tryb testowy: wlaczany WYLACZNIE z panelu administratora, po zalogowaniu
+   haslem z ADMIN_PASSWORD. Uczen nie ma jak go wlaczyc, bo warunkiem jest
+   rola 'admin' w sesji po stronie serwera. saveProgress i tak odrzuca zapis
+   dla roli innej niz 'student', wiec klikanie tu nie rusza zadnego konta. */
+let testMode=false;
+function inTestMode(){ return testMode && currentUser && currentUser.role==='admin'; }
 
 function enterStudent(){
   $('#studentName').textContent=currentUser.displayName;
@@ -443,7 +450,17 @@ function renderIntro(stage,item){
       status.textContent=result.msg||'Spróbuj jeszcze raz.';button.textContent='Powiedz jeszcze raz';say(card.en);
     });
   });
+  if(inTestMode()) mic.append(makeSkip('Pomiń wymowę',accept));
   setTimeout(()=>say(card.en),250);
+}
+
+/* Przycisk pominiecia. Powstaje tylko w trybie testowym, wiec w zwyklej
+   sesji ucznia nie istnieje w drzewie dokumentu, a nie jest jedynie ukryty. */
+function makeSkip(label,action){
+  const button=make('button','skip-test',label);
+  button.type='button';
+  button.addEventListener('click',()=>{stopSpeech();clearTimeout(advanceTimer);action();});
+  return button;
 }
 
 function escapeHtml(value){return value.replace(/[&<>]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[char]));}
@@ -480,6 +497,9 @@ function renderType(stage,item){
     say(card.en);try{input.focus();input.select();}catch(error){}
   };
   checkButton.addEventListener('click',check);input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();check();}});setTimeout(()=>input.focus(),130);
+  // Pominiecie wpisuje poprawne slowo i uruchamia normalna sciezke sprawdzenia,
+  // zeby test przechodzil przez ten sam kod co uczen, a nie obok niego.
+  if(inTestMode()) stage.append(makeSkip('Pomiń wpisywanie',()=>{input.value=card.en;check();}));
 }
 
 function renderChoice(stage,item){
@@ -515,7 +535,7 @@ function finishLearning(){
   $('#doneTitle').textContent=added.length?'Kolekcja rośnie!':'Powtórka zakończona!';
   const list=$('#dList');list.textContent='';added.forEach(card=>list.append(make('span','',card.ic+' '+card.en)));
   const action=$('#doneAction');action.textContent='';
-  if(count===20&&!sectionPassed(currentSectionIndex)){
+  if(inTestMode()||(count===20&&!sectionPassed(currentSectionIndex))){
     const button=make('button','primary wide','Zdaj egzamin');button.type='button';button.addEventListener('click',()=>startExam(currentSectionIndex));action.append(button);
   }
   show('done');
@@ -525,7 +545,7 @@ function finishLearning(){
 let examDeck=[],examRoundIndex=0,examMatched=new Set(),selectedImage=null,selectedWord=null,examBusy=false;
 
 function startExam(index){
-  if(index>=openSectionCount()||sectionCollected(index)!==20){toast('Najpierw zbierz wszystkie 20 słów.');return;}
+  if(!inTestMode()&&(index>=openSectionCount()||sectionCollected(index)!==20)){toast('Najpierw zbierz wszystkie 20 słów.');return;}
   currentSectionIndex=index;examDeck=shuffle(SECTIONS[index].cards);examRoundIndex=0;
   $('#examSectionName').textContent=SECTIONS[index].name;$('#examTitle').textContent=SECTIONS[index].name;
   $('#matchBoard').hidden=false;$('#examComplete').hidden=true;show('exam');renderExamRound();
@@ -540,6 +560,16 @@ function renderExamRound(){
   const images=$('#examImages'),words=$('#examWords');images.textContent='';words.textContent='';
   shuffle(cards).forEach(card=>images.append(createMatchButton('image',card)));
   shuffle(cards).forEach(card=>words.append(createMatchButton('word',card)));
+  const skipHost=$('#examSkip');
+  if(skipHost){
+    skipHost.textContent='';
+    if(inTestMode()){
+      skipHost.hidden=false;
+      skipHost.append(makeSkip('Pomiń rundę '+(examRoundIndex+1),()=>{examBusy=false;advanceExam();}));
+    }else{
+      skipHost.hidden=true;
+    }
+  }
 }
 
 function createMatchButton(kind,card){
@@ -597,7 +627,20 @@ function advanceExam(){
 /* ==================== PANEL ADMINISTRATORA ==================== */
 let lastCredentials=null;
 
-async function enterAdmin(){show('admin');await renderStudents();}
+async function enterAdmin(){testMode=false;$('#testBanner').hidden=true;show('admin');await renderStudents();}
+
+/* Wejscie w tryb testowy. Stan startowy jest lokalny i pusty, zadne
+   /api/progress nie jest wolane, wiec konta uczniow pozostaja nietkniete. */
+function enterTestMode(){
+  if(!currentUser||currentUser.role!=='admin')return;
+  testMode=true;
+  S=emptyState();
+  $('#testBanner').hidden=false;
+  $('#studentName').textContent='Tryb testowy';
+  $('#welcomeName').textContent='Tryb testowy';
+  setSync('tryb testowy, bez zapisu');
+  renderHome();show('home');
+}
 function formatActivity(value){
   if(!value)return '—';
   try{return new Intl.DateTimeFormat('pl-PL',{dateStyle:'short',timeStyle:'short'}).format(new Date(value));}catch(error){return '—';}
@@ -646,6 +689,8 @@ $('#studentRegister').addEventListener('submit',async event=>{
 });
 /* Przycisk pojawia sie tylko wtedy, gdy serwer dopuszcza samodzielna rejestracje. */
 api('/api/config').then(config=>{ if(config&&config.selfRegistration)$('#openRegister').hidden=false; }).catch(()=>{});
+$('#openTestMode').addEventListener('click',enterTestMode);
+$('#leaveTestMode').addEventListener('click',()=>{stopSpeech();clearTimeout(advanceTimer);enterAdmin();});
 $('#openAdminLogin').addEventListener('click',()=>show('admin-login'));
 $('#backToStudentLogin').addEventListener('click',()=>show('login'));
 $('#studentLogin').addEventListener('submit',async event=>{

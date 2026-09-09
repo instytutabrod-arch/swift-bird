@@ -1,4 +1,4 @@
-# Swift-bird — wersja 10.2
+# Swift-bird — wersja 10.3
 
 Szkolna aplikacja internetowa do nauki angielskich słów. Uczniowie logują się
 bez adresu e-mail: imieniem, pierwszą literą nazwiska i indywidualnym
@@ -17,6 +17,8 @@ urządzeniach po zalogowaniu na to samo konto.
   odsłuchać; poprawna para mówi `Good`, błędna `Try again`;
 - dopiero zdany egzamin odblokowuje następną sekcję;
 - panel administratora tworzy konta, pokazuje postępy i generuje nowy PIN;
+- panel ma tryb testowy: przejście całej ścieżki ucznia z pominięciem
+  mikrofonu, wpisywania i rund egzaminu, przy wszystkich sekcjach otwartych;
 - uczeń może też sam założyć konto i wymyślić własny PIN, o ile zmienna
   `ALLOW_SELF_REGISTRATION` nie jest ustawiona na `0`.
 
@@ -56,6 +58,18 @@ Jeżeli rozpakowany katalog na Macu nazywa się `swift-bird-v10.1`, użyj jego p
 Po wdrożeniu otwórz `/`, wybierz **Panel administratora**, zaloguj się hasłem z
 `ADMIN_PASSWORD`, utwórz pierwszego ucznia i zapisz wygenerowany PIN.
 
+## Tryb testowy
+
+Panel administratora, karta **Diagnostyka**, przycisk **Wejdź w tryb testowy**.
+Otwiera ścieżkę ucznia z trzema przyciskami pomijania: wymowy, wpisywania i
+rundy egzaminu. Wszystkie 25 sekcji jest odblokowanych.
+
+Tryb jest zamknięty dla uczniów na dwa niezależne sposoby. Warunkiem włączenia
+jest rola `admin` w sesji po stronie serwera, a nie sama flaga po stronie
+przeglądarki. Do tego `saveProgress` odrzuca zapis dla każdej roli innej niż
+`student`, więc klikanie w trybie testowym nie zmienia żadnego konta ucznia,
+nawet gdyby pierwsza zapora zawiodła.
+
 ## Uruchomienie i testy lokalne
 
 Wymagany jest Node.js 20+ i dostępna baza PostgreSQL:
@@ -79,7 +93,7 @@ npm test
 | `app.js` | nauka, wymowa, egzaminy, panel i synchronizacja |
 | `words.js` | 25 sekcji i 500 słów z piktogramami |
 | `styles.css` | wygląd na tablet, telefon i komputer |
-| `server.js` | logowanie, sesje, konta, postępy i pliki statyczne |
+| `server.js` | logowanie, rejestracja, sesje, konta, postępy i pliki statyczne |
 | `Dockerfile` | produkcyjny obraz Node dla Railway |
 | `sw.js`, `manifest.webmanifest` | instalowalna aplikacja PWA |
 | `.env.example` | przykładowe nazwy zmiennych do pracy lokalnej |

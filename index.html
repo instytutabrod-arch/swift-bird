@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <div id="testBanner" hidden>TRYB TESTOWY · postęp nie jest zapisywany <button id="leaveTestMode" type="button">Wróć do panelu</button></div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <section id="s-login" class="screen auth-screen on">
@@ -36,7 +37,7 @@
       </form>
       <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
       <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
-      <p class="version-label">Wersja 10.2</p>
+      <p class="version-label">Wersja 10.3</p>
     </div>
   </section>
 
@@ -141,6 +142,7 @@
       <p class="exam-instruction">Kliknij obrazek, a potem pasujące słowo. Każdy element możesz odsłuchać.</p>
       <div class="exam-progress"><i id="examProgress"></i></div>
       <p id="examFeedback" class="exam-feedback" aria-live="assertive"></p>
+      <div id="examSkip" hidden></div>
       <div id="matchBoard" class="match-board">
         <div><h2>Obrazki</h2><div id="examImages" class="match-column"></div></div>
         <div><h2>Słowa</h2><div id="examWords" class="match-column"></div></div>
@@ -162,6 +164,10 @@
           <label>Litera nazwiska<input id="newLastInitial" maxlength="1" required></label>
           <button class="primary" type="submit">Utwórz konto</button>
         </form>
+      </section>
+      <section class="admin-card create-card">
+        <div><p class="eyebrow">Diagnostyka</p><h2>Tryb testowy</h2><p>Przejście całej ścieżki ucznia bez mikrofonu i bez wpisywania. Wszystkie sekcje otwarte, postęp nigdzie nie jest zapisywany.</p></div>
+        <button id="openTestMode" class="secondary" type="button">Wejdź w tryb testowy</button>
       </section>
       <section id="credentialsCard" class="credentials-card" hidden>
         <div><p class="eyebrow">Dane logowania – zapisz teraz</p><h2 id="credentialsName"></h2></div>
