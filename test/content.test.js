@@ -133,3 +133,23 @@ test('trafiona para na egzaminie nie wywołuje pochwały', () => {
   // Komunikat przy błędzie zostaje, bo to informacja, nie pochwała.
   assert.match(app, /feedback\.textContent='Try again'/);
 });
+
+test('egzamin otwiera się dopiero po 20 zebranych słowach, także w trybie testowym', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+
+  // startExam nie ma zadnej furtki dla trybu testowego.
+  const guard = app.slice(app.indexOf('function startExam('), app.indexOf('function renderExamRound('));
+  assert.match(guard, /sectionCollected\(index\)!==20/);
+  assert.doesNotMatch(guard, /inTestMode/, 'startExam nie może omijać bramki 20 słów');
+
+  // Oba przyciski "Zdaj egzamin" wymagaja count===20 i nie sa warunkowane trybem.
+  const occurrences = app.match(/[^\n]*'Zdaj egzamin'[^\n]*/g) || [];
+  assert.equal(occurrences.length, 2);
+  occurrences.forEach(line => assert.doesNotMatch(line, /inTestMode/));
+  assert.match(app, /if\(count===20&&!passed\)\{/);
+  assert.match(app, /if\(count===20&&!sectionPassed\(currentSectionIndex\)\)\{/);
+
+  // Tryb testowy skraca droge DO bramki, uzupelniajac sekcje.
+  assert.match(app, /if\(inTestMode\(\) && count<20\)\{/);
+  assert.match(app, /makeSkip\('Uzupełnij sekcję do 20 słów'/);
+});

@@ -1,4 +1,4 @@
-# Swift-bird — wersja 10.4
+# Swift-bird — wersja 10.5
 
 Szkolna aplikacja internetowa do nauki angielskich słów. Uczniowie logują się
 bez adresu e-mail: imieniem, pierwszą literą nazwiska i indywidualnym
@@ -77,8 +77,14 @@ Google, English (United Kingdom).
 ## Tryb testowy
 
 Panel administratora, karta **Diagnostyka**, przycisk **Wejdź w tryb testowy**.
-Otwiera ścieżkę ucznia z trzema przyciskami pomijania: wymowy, wpisywania i
-rundy egzaminu. Wszystkie 25 sekcji jest odblokowanych.
+Otwiera ścieżkę ucznia z przyciskami pomijania: wymowy, wpisywania i rundy
+egzaminu. Dodatkowo, dopóki sekcja nie ma 20 słów, dostępny jest przycisk
+**Uzupełnij sekcję do 20 słów**. Wszystkie 25 sekcji jest odblokowanych.
+
+Tryb testowy nie omija bramki egzaminu. Egzamin zawsze wymaga 20 zebranych
+słów w sekcji, także dla administratora: skrót uzupełnia sekcję, po czym
+egzamin otwiera się tą samą drogą co u ucznia. Dzięki temu test sprawdza
+realny warunek, a nie ścieżkę, której uczeń nigdy nie przejdzie.
 
 Tryb jest zamknięty dla uczniów na dwa niezależne sposoby. Warunkiem włączenia
 jest rola `admin` w sesji po stronie serwera, a nie sama flaga po stronie

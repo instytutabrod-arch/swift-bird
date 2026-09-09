@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '10.4';
+const APP_VERSION = '10.5';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -419,6 +419,14 @@ function renderSection(index){
     button.textContent=count?'Kontynuuj naukę':'Rozpocznij naukę'; button.addEventListener('click',startLearning);
   }
   action.append(note,button);
+  /* Tryb testowy nie omija bramki egzaminu: uzupelnia sekcje do 20 slow,
+     po czym egzamin otwiera sie normalna droga, tak jak u ucznia. */
+  if(inTestMode() && count<20){
+    action.append(makeSkip('Uzupełnij sekcję do 20 słów',()=>{
+      section.cards.forEach(card=>{ if(!seen(card.id)) grade(card.id,true); });
+      renderSection(index);
+    }));
+  }
   show('section');
 }
 
@@ -588,7 +596,7 @@ function finishLearning(){
   $('#doneTitle').textContent=added.length?'Kolekcja rośnie!':'Powtórka zakończona!';
   const list=$('#dList');list.textContent='';added.forEach(card=>list.append(make('span','',card.ic+' '+card.en)));
   const action=$('#doneAction');action.textContent='';
-  if(inTestMode()||(count===20&&!sectionPassed(currentSectionIndex))){
+  if(count===20&&!sectionPassed(currentSectionIndex)){
     const button=make('button','primary wide','Zdaj egzamin');button.type='button';button.addEventListener('click',()=>startExam(currentSectionIndex));action.append(button);
   }
   show('done');
@@ -598,7 +606,7 @@ function finishLearning(){
 let examDeck=[],examRoundIndex=0,examMatched=new Set(),selectedImage=null,selectedWord=null,examBusy=false;
 
 function startExam(index){
-  if(!inTestMode()&&(index>=openSectionCount()||sectionCollected(index)!==20)){toast('Najpierw zbierz wszystkie 20 słów.');return;}
+  if(index>=openSectionCount()||sectionCollected(index)!==20){toast('Najpierw zbierz wszystkie 20 słów.');return;}
   currentSectionIndex=index;examDeck=shuffle(SECTIONS[index].cards);examRoundIndex=0;
   $('#examSectionName').textContent=SECTIONS[index].name;$('#examTitle').textContent=SECTIONS[index].name;
   $('#matchBoard').hidden=false;$('#examComplete').hidden=true;show('exam');renderExamRound();

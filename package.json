@@ -1,6 +1,6 @@
 {
   "name": "swift-bird",
-  "version": "10.4.0",
+  "version": "10.5.0",
   "private": true,
   "description": "Szkolna aplikacja do nauki angielskich słów",
   "main": "server.js",
