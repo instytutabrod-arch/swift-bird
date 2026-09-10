@@ -17,6 +17,21 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <div id="badgeModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="badgeName">
+    <div class="modal-card">
+      <p class="modal-eyebrow">Nowa odznaka</p>
+      <div id="badgeBigIcon" class="modal-icon">🏅</div>
+      <h2 id="badgeName">Odznaka</h2>
+      <p id="badgeDesc" class="modal-desc"></p>
+      <p id="badgeReward" class="modal-reward"></p>
+      <div id="badgeStory" class="modal-story" hidden></div>
+      <button id="badgeStoryButton" class="primary wide" type="button">Przeczytaj historyjkę</button>
+      <button id="badgeRewardButton" class="secondary wide" type="button">Zobacz nagrodę</button>
+      <button id="badgeClose" class="text-button" type="button">Zamknij</button>
+      <p id="badgeQueueNote" class="modal-queue"></p>
+    </div>
+  </div>
+
   <div id="testBanner" hidden>TRYB TESTOWY · postęp nie jest zapisywany <button id="leaveTestMode" type="button">Wróć do panelu</button></div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
@@ -37,7 +52,7 @@
       </form>
       <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
       <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
-      <p class="version-label">Wersja 11.0</p>
+      <p class="version-label">Wersja 11.1</p>
     </div>
   </section>
 

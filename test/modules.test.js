@@ -178,3 +178,41 @@ test('serwer zapisuje i ogranicza dane nowych modułów', () => {
   assert.equal(clean.badges.length, 1, 'zbyt długi identyfikator odznaki musi wypaść');
   assert.equal(clean.nieznanePole, undefined, 'nieznane pola nie mogą przechodzić');
 });
+
+test('każda odznaka ma ikonę, nagrodę i historyjkę do przeczytania', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const start = app.indexOf('const BADGES = [');
+  const end = app.indexOf('const BADGE_TESTS');
+  assert.ok(start !== -1 && end > start, 'brak definicji odznak');
+  const badges = new Function(app.slice(start, end) + 'return BADGES;')();
+  assert.ok(badges.length >= 7, 'za mało odznak');
+  badges.forEach(badge => {
+    assert.ok(badge.icon, badge.id + ': brak ikony');
+    assert.ok(badge.reward, badge.id + ': brak opisu nagrody');
+    assert.ok(badge.story && badge.story.split(' ').length >= 30, badge.id + ': historyjka za krótka');
+  });
+  // Okno, nie znikający napis: zdobycie odznaki ma być momentem.
+  assert.match(app, /function showNextBadge\(\)/);
+  assert.match(app, /let badgeQueue = \[\]/, 'kilka odznak naraz musi ustawić się w kolejce');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  ['badgeModal', 'badgeStory', 'badgeStoryButton', 'badgeRewardButton', 'badgeClose', 'badgeQueueNote']
+    .forEach(id => assert.ok(html.includes('id="' + id + '"'), 'brak elementu ' + id));
+});
+
+test('warunek odznaki detektywa jest osiągalny', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const start = app.indexOf('const BADGE_TESTS');
+  const end = app.indexOf('const DAILY_CHALLENGES');
+  const tests = new Function('collectedTotal', 'countOk', app.slice(start, end) + 'return BADGE_TESTS;')(
+    state => Object.keys(state.cards || {}).length,
+    map => Object.values(map || {}).reduce((sum, item) => sum + (item.ok || 0), 0)
+  );
+  // Wcześniej próg wynosił 20 przy banku liczącym dokładnie 20 pozycji,
+  // więc odznaka wymagała trafienia wszystkich za pierwszym razem.
+  const threshold = ERROR_BANK.length;
+  const almost = Object.fromEntries(Array.from({ length: threshold - 1 }, (_, i) => ['e' + i, { ok: 1 }]));
+  assert.equal(tests.detective({ errorCards: almost }), true,
+    'odznaka musi być osiągalna bez kompletu bezbłędnych trafień');
+  const few = Object.fromEntries(Array.from({ length: 3 }, (_, i) => ['e' + i, { ok: 1 }]));
+  assert.equal(tests.detective({ errorCards: few }), false, 'próg nie może być trywialny');
+});

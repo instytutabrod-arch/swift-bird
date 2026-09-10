@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '11.0';
+const APP_VERSION = '11.1';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -29,14 +29,43 @@ const ORDER_ITEMS = (window.ORDERINGS || []);
 const JOURNEY_STOPS = (window.JOURNEY || []);
 
 const BADGES = [
-  { id:'first-hundred', name:'Pierwsza setka',  desc:'100 słów w kolekcji',                    test: state => collectedTotal(state) >= 100 },
-  { id:'flawless',      name:'Bez potknięcia',  desc:'egzamin sekcji bez ani jednego błędu',   manual: true },
-  { id:'detective',     name:'Detektyw',        desc:'20 poprawionych i uzasadnionych błędów', test: state => countOk(state.errorCards) >= 20 },
-  { id:'speaker',       name:'Rozmówca',        desc:'30 pełnych zdań powiedzianych na głos',  test: state => countOk(state.dialogues) >= 30 },
-  { id:'golden-word',   name:'Złote słowo',     desc:'słowo utrwalone do końca',               test: state => Object.values(state.cards).some(card => card.i >= 35) },
-  { id:'builder',       name:'Budowniczy zdań', desc:'50 zdań ułożonych bez błędu',            test: state => countOk(state.patterns) >= 50 },
-  { id:'persistent',    name:'Wytrwałość',      desc:'7 dni z rzędu',                          test: state => state.streak >= 7 }
+  { id:'first-hundred', name:'Pierwsza setka', icon:'💯',
+    desc:'100 słów w kolekcji',
+    reward:'Jerzyk dostaje zapas na drogę.',
+    story:'Jerzyk łapie owady w locie, nigdy na ziemi. Zbiera je w gardle w małą kulkę, sklejoną własną śliną, i dopiero taką porcję zanosi młodym. W jednej kulce potrafi być kilkaset owadów. Twoje sto słów to dokładnie taka kulka: same w sobie drobne, razem wystarczają na długi lot.' },
+  { id:'builder', name:'Budowniczy zdań', icon:'🧱',
+    desc:'50 zdań ułożonych bez błędu',
+    reward:'Gniazdo w gnieździe rośnie.',
+    story:'Jerzyk buduje gniazdo z tego, co złapie w powietrzu: piórek, źdźbeł, kawałków liści porwanych przez wiatr. Skleja je własną śliną, która zasycha na twardo. Nic nie zbiera z ziemi, wszystko chwyta w locie. Ty też budujesz zdania z kawałków, które już masz.' },
+  { id:'flawless', name:'Bez potknięcia', icon:'🎯',
+    desc:'egzamin sekcji bez ani jednej pomyłki',
+    reward:'Czysty przelot nad przystankiem.',
+    story:'Jerzyk potrafi pić bez lądowania. Zniża lot nad wodą, muska ją dziobem i leci dalej, nie zwalniając. Nie siada, bo z płaskiej ziemi bardzo trudno mu wystartować: ma malutkie nóżki i długie skrzydła. Twój egzamin bez pomyłki wyglądał dokładnie tak: jeden gładki przelot.', manual:true },
+  { id:'detective', name:'Detektyw', icon:'🔍',
+    desc:'15 zadań detektywa z poprawnym uzasadnieniem',
+    reward:'Ostre oko na trasie.',
+    story:'Jerzyk poluje na owady tak drobne, że my ich z ziemi nie widzimy. Naukowcy nazywają tę chmurę unoszącą się wysoko nad nami aeroplanktonem. Ptak dostrzega w niej pojedynczą muszkę i chwyta ją przy prędkości, przy której my nie zdążylibyśmy mrugnąć. Wyłapywanie błędu w zdaniu to ta sama umiejętność: widzieć drobiazg, który innym umyka.' },
+  { id:'speaker', name:'Rozmówca', icon:'🗣️',
+    desc:'30 pełnych zdań powiedzianych na głos',
+    reward:'Głos nad dachami.',
+    story:'Latem nad polskimi wsiami słychać ostre, przeciągłe piski. To jerzyki krążą stadem nad dachami i wołają do siebie w locie. Ten dźwięk to jeden z niewielu sposobów, w jakie dają o sobie znać, bo widać je rzadko: prawie nie siadają. Ty też właśnie zacząłeś być słyszalny po angielsku.' },
+  { id:'golden-word', name:'Złote słowo', icon:'🥇',
+    desc:'słowo utrwalone do samego końca',
+    reward:'Coś, czego już nie zgubisz.',
+    story:'Młody jerzyk po opuszczeniu gniazda potrafi nie usiąść przez wiele miesięcy. Śpi w locie, wznosząc się wieczorem wysoko i drzemiąc krótkimi chwilami. Nie musi się uczyć tego od nowa każdego dnia, po prostu to umie. Twoje złote słowo jest już takie: siedzi w tobie i nie wymaga wysiłku.' },
+  { id:'persistent', name:'Wytrwałość', icon:'📆',
+    desc:'7 dni z rzędu',
+    reward:'Siódmy dzień lotu.',
+    story:'Jerzyk zwyczajny spędza w powietrzu prawie całe życie. Je, pije, śpi i łączy się w pary w locie. Nazwa jego rodzaju, Apus, znaczy po grecku „bez nóg", bo dawniej sądzono, że ten ptak wcale nie ląduje. Siedem dni z rzędu to twój pierwszy taki nieprzerwany lot.' }
 ];
+const BADGE_TESTS = {
+  'first-hundred': state => collectedTotal(state) >= 100,
+  'detective':     state => countOk(state.errorCards) >= 15,
+  'speaker':       state => countOk(state.dialogues) >= 30,
+  'golden-word':   state => Object.values(state.cards).some(card => card.i >= 35),
+  'builder':       state => countOk(state.patterns) >= 50,
+  'persistent':    state => state.streak >= 7
+};
 
 const DAILY_CHALLENGES = [
   { id:'d-sentences', text:'Dziś ułóż pięć zdań bez błędu.',                  goal:5, counter:'patternPerfect' },
@@ -1110,8 +1139,9 @@ function challengeProgress(){
 function checkBadges(){
   const earned = [];
   BADGES.forEach(badge => {
-    if(S.badges.includes(badge.id) || badge.manual || !badge.test) return;
-    if(badge.test(S)){ S.badges.push(badge.id); earned.push(badge); }
+    if(S.badges.includes(badge.id) || badge.manual) return;
+    const test = BADGE_TESTS[badge.id];
+    if(test && test(S)){ S.badges.push(badge.id); earned.push(badge); }
   });
   return earned;
 }
@@ -1121,9 +1151,54 @@ function grantBadge(id){
   S.badges.push(id);
   return badge;
 }
+/* Odznaki pokazujemy w oknie, nie jako znikający napis: zdobycie odznaki
+   ma być momentem, a nie komunikatem, który dziecko przegapi.
+   Kilka odznak naraz ustawia się w kolejce, jedna po drugiej. */
+let badgeQueue = [];
+
 function announceBadges(list){
-  list.forEach((badge,index) => setTimeout(()=>toast('Nowa odznaka: '+badge.name),600*(index+1)));
+  if(!list || !list.length) return;
+  badgeQueue = badgeQueue.concat(list);
+  if($('#badgeModal').hidden) showNextBadge();
 }
+
+function showNextBadge(){
+  const badge = badgeQueue.shift();
+  const modal = $('#badgeModal');
+  if(!badge){ modal.hidden = true; return; }
+  $('#badgeBigIcon').textContent = badge.icon || '🏅';
+  $('#badgeName').textContent = badge.name;
+  $('#badgeDesc').textContent = badge.desc;
+  $('#badgeReward').textContent = badge.reward || '';
+  const story = $('#badgeStory');
+  story.textContent = badge.story || '';
+  story.hidden = true;
+  $('#badgeStoryButton').textContent = 'Przeczytaj historyjkę';
+  $('#badgeStoryButton').hidden = !badge.story;
+  $('#badgeQueueNote').textContent = badgeQueue.length
+    ? 'Czeka jeszcze ' + badgeQueue.length + (badgeQueue.length === 1 ? ' odznaka.' : ' odznaki.')
+    : '';
+  modal.hidden = false;
+  stopSpeech();
+}
+
+function closeBadge(){
+  $('#badgeModal').hidden = true;
+  if(badgeQueue.length) setTimeout(showNextBadge,350);
+}
+
+$('#badgeStoryButton').addEventListener('click',()=>{
+  const story = $('#badgeStory');
+  story.hidden = !story.hidden;
+  $('#badgeStoryButton').textContent = story.hidden ? 'Przeczytaj historyjkę' : 'Zwiń historyjkę';
+});
+$('#badgeRewardButton').addEventListener('click',()=>{
+  badgeQueue = [];
+  $('#badgeModal').hidden = true;
+  renderMap();
+  show('map');
+});
+$('#badgeClose').addEventListener('click',closeBadge);
 
 /* Postęp wyprawy wynika z liczby zdanych egzaminów, więc nie trzeba
    przechowywać go osobno i nie da się rozjechać ze stanem sekcji. */
@@ -1705,10 +1780,15 @@ function renderMap(){
   badges.textContent = '';
   BADGES.forEach(badge => {
     const owned = S.badges.includes(badge.id);
-    const chip = make('div','badge-card' + (owned ? ' owned' : ''));
-    chip.append(make('span','badge-icon',owned ? '🏅' : '🔒'));
+    const chip = make('button','badge-card' + (owned ? ' owned' : ''));
+    chip.type = 'button';
+    chip.append(make('span','badge-icon',owned ? (badge.icon||'🏅') : '🔒'));
     chip.append(make('strong','',badge.name));
     chip.append(make('span','badge-desc',badge.desc));
+    /* Zdobyte odznaki dają się otworzyć ponownie, żeby dało się wrócić
+       do historyjki później, a nie tylko w chwili zdobycia. */
+    if(owned) chip.addEventListener('click',()=>{ badgeQueue=[badge]; showNextBadge(); });
+    else chip.disabled = true;
     badges.append(chip);
   });
 }
