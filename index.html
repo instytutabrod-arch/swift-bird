@@ -37,7 +37,7 @@
       </form>
       <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
       <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
-      <p class="version-label">Wersja 10.5</p>
+      <p class="version-label">Wersja 11.0</p>
     </div>
   </section>
 
@@ -97,6 +97,11 @@
         <div><b id="allCollected">0</b><span>z 500 słów</span></div>
         <div><b id="passedN">0</b><span>zdanych egzaminów</span></div>
         <div><b id="openN">1</b><span>otwartych sekcji</span></div>
+        <div><b id="featherN">0</b><span>piórka</span></div>
+      </section>
+      <section class="home-actions">
+        <button id="openMap" class="secondary wide" type="button">Wyprawa Jerzyka</button>
+        <p id="challengeLine" class="done-challenge"></p>
       </section>
       <div class="section-heading"><div><p class="eyebrow">25 etapów</p><h2>Sekcje słówek</h2></div><p>Każda sekcja zawiera 20 słów. Zbierz je i zdaj egzamin, aby otworzyć kolejną.</p></div>
       <div id="sectionsGrid" class="sections-grid"></div>
@@ -128,10 +133,33 @@
         <div><b id="dNew">0</b><span>nowe słowa</span></div>
         <div><b id="dOk">0</b><span>trafione</span></div>
         <div><b id="dSection">0</b><span>z 20 zebranych</span></div>
+        <div><b id="dFeathers">0</b><span>piórka</span></div>
       </div>
+      <p id="doneChallenge" class="done-challenge"></p>
       <div id="dList" class="new-list"></div>
       <div id="doneAction"></div>
       <button id="doneBack" class="secondary wide" type="button">Wróć do sekcji</button>
+    </main>
+  </section>
+
+  <section id="s-break" class="screen app-screen">
+    <main class="content narrow break">
+      <p class="tag">Przerwa między etapami</p>
+      <div class="feather-count"><b id="breakFeathers">0</b><span>piórka</span></div>
+      <div id="breakBody" class="break-body"></div>
+      <button id="breakContinue" class="primary wide" type="button">Lecimy dalej</button>
+      <button id="breakStop" class="secondary wide" type="button">Kończę na dziś</button>
+    </main>
+  </section>
+
+  <section id="s-map" class="screen app-screen">
+    <header class="simple-header"><button id="mapBack" class="back-button" type="button">← Wróć</button><span>Wyprawa Jerzyka</span></header>
+    <main class="content">
+      <p class="lead" id="mapLead"></p>
+      <ol id="mapList" class="map-list"></ol>
+      <h2 class="map-heading">Odznaki</h2>
+      <div id="badgeList" class="badge-list"></div>
+      <p class="fine-print">Wyprawa jest wymyślona, ale każdy fakt jest prawdziwy.</p>
     </main>
   </section>
 
@@ -189,6 +217,11 @@
   </section>
 
   <script src="./words.js"></script>
+  <script src="./patterns.js"></script>
+  <script src="./stories.js"></script>
+  <script src="./dialogues.js"></script>
+  <script src="./errors.js"></script>
+  <script src="./journey.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

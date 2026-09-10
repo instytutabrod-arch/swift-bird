@@ -146,8 +146,8 @@ test('egzamin otwiera się dopiero po 20 zebranych słowach, także w trybie tes
   const occurrences = app.match(/[^\n]*'Zdaj egzamin'[^\n]*/g) || [];
   assert.equal(occurrences.length, 2);
   occurrences.forEach(line => assert.doesNotMatch(line, /inTestMode/));
-  assert.match(app, /if\(count===20&&!passed\)\{/);
-  assert.match(app, /if\(count===20&&!sectionPassed\(currentSectionIndex\)\)\{/);
+  assert.match(app, /if\(count\s*===\s*20\s*&&\s*!passed\)\{/);
+  assert.match(app, /if\(count\s*===\s*20\s*&&\s*!sectionPassed\(currentSectionIndex\)\)\{/);
 
   // Tryb testowy skraca droge DO bramki, uzupelniajac sekcje.
   assert.match(app, /if\(inTestMode\(\) && count<20\)\{/);

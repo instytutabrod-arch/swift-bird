@@ -105,3 +105,82 @@ input:focus{border-color:var(--ink-soft)}
 #examSkip{text-align:center}
 
 .voice-info{margin:14px 0 10px;font-size:.82rem;line-height:1.6;color:var(--muted)}
+
+/* ==================== M2 do M5 ==================== */
+.pattern-pl{font-family:var(--display);font-weight:700;font-size:1.35rem;margin:6px 0 4px}
+.pattern-hint{font-size:.85rem;color:var(--muted);margin:0}
+.sentence-line{
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;
+  min-height:74px;padding:12px;border-radius:16px;border:2px dashed #2f4f85;margin-bottom:16px;
+}
+.line-empty{color:var(--muted);font-size:.88rem}
+.brick-bank{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-bottom:14px}
+.brick{
+  background:var(--paper);color:var(--ink);border:0;border-radius:12px;padding:12px 15px;
+  font-family:var(--display);font-weight:700;font-size:1.15rem;box-shadow:0 3px 0 var(--paper-dim);cursor:pointer;
+}
+.brick:disabled{opacity:.25}
+.brick.placed{background:var(--blue);color:#08203f;box-shadow:0 3px 0 #4a86d8}
+.brick.right{background:var(--green);color:#08301f;box-shadow:0 3px 0 var(--green-dark)}
+.brick.wrong{background:var(--pink);color:#fff;box-shadow:0 3px 0 #c73f68}
+
+.story-card{text-align:left}
+.story-title{font-family:var(--display);font-size:1.3rem;margin:2px 0 10px}
+.story-text{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.story-line{
+  background:transparent;border:0;text-align:left;color:var(--ink);
+  font-size:1.05rem;line-height:1.55;padding:5px 6px;border-radius:8px;cursor:pointer;
+}
+.story-line:active{background:rgba(18,41,79,.08)}
+.story-question{font-family:var(--display);font-weight:700;font-size:1.25rem;margin:6px 0 2px}
+.wide-opts{grid-template-columns:1fr}
+.text-opt{font-size:1.02rem;font-weight:600;min-height:64px;line-height:1.45;padding:14px 16px}
+
+.dialogue-card{text-align:left}
+.dialogue-intro{color:#5b6d8c;font-size:.92rem;margin:0 0 10px}
+.dialogue-ask{font-family:var(--display);font-weight:700;font-size:1.3rem;margin:0 0 4px}
+
+.compare-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.compare-side{background:var(--paper);color:var(--ink);border-radius:14px;padding:12px 8px;text-align:center}
+.compare-side .big{font-size:2.6rem;line-height:1.2}
+
+.order-list,.order-bank{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.order-list{min-height:70px;padding:10px;border-radius:14px;border:2px dashed #2f4f85}
+.order-row{
+  background:var(--paper);color:var(--ink);border:0;border-radius:12px;padding:12px 14px;
+  text-align:left;font-size:1rem;line-height:1.45;box-shadow:0 3px 0 var(--paper-dim);cursor:pointer;
+}
+.order-row:disabled{opacity:.25}
+
+/* ==================== PRZERWA, WYPRAWA, NAGRODY ==================== */
+.break{text-align:center}
+.feather-count{margin:6px 0 18px}
+.feather-count b{display:block;font-family:var(--display);font-size:2.4rem;color:var(--yellow);line-height:1}
+.feather-count span{font-size:.78rem;color:var(--muted)}
+.break-body{margin-bottom:22px}
+.break-place{font-family:var(--display);font-weight:700;font-size:1.25rem;margin:0 0 6px}
+.break-fact{color:var(--muted);font-size:.95rem;line-height:1.6;margin:0 0 14px}
+.break-next{font-size:.9rem;color:var(--paper);margin:0 0 6px}
+.break-challenge{font-size:.88rem;color:var(--yellow);margin:0}
+.done-challenge{font-size:.9rem;color:var(--muted);margin:2px 0 14px}
+.done-challenge.good{color:var(--green);font-weight:600}
+.home-actions{margin:14px 0 4px}
+
+.map-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.map-stop{display:flex;gap:12px;align-items:flex-start;background:#1a3564;border-radius:14px;padding:12px 14px;opacity:.5}
+.map-stop.reached{opacity:1}
+.map-stop.current{box-shadow:inset 0 0 0 2px var(--yellow)}
+.map-number{
+  flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:var(--ink-deep);
+  display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:.9rem;
+}
+.map-stop.reached .map-number{background:var(--green);color:#08301f}
+.map-body{display:flex;flex-direction:column;gap:4px}
+.map-fact{font-size:.86rem;color:var(--muted);line-height:1.55}
+.map-heading{font-family:var(--display);font-size:1.15rem;margin:26px 0 10px}
+.badge-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.badge-card{background:#1a3564;border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:4px;opacity:.45}
+.badge-card.owned{opacity:1;box-shadow:inset 0 -3px 0 var(--yellow)}
+.badge-icon{font-size:1.5rem}
+.badge-desc{font-size:.78rem;color:var(--muted);line-height:1.45}
+.badge-chip{background:var(--yellow);color:#3a2a00;border-radius:10px;padding:7px 11px;font-weight:700;font-size:.85rem}

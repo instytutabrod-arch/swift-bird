@@ -1,11 +1,16 @@
 'use strict';
 
-const VERSION = 'swift-bird-v10-5';
+const VERSION = 'swift-bird-v11-0';
 const SHELL = [
   './',
   './index.html',
   './app.js',
   './words.js',
+  './patterns.js',
+  './stories.js',
+  './dialogues.js',
+  './errors.js',
+  './journey.js',
   './styles.css',
   './manifest.webmanifest',
   './icon-192.png',

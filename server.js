@@ -175,30 +175,71 @@ function allowAttempt(key){
 }
 function clearAttempts(key){attempts.delete(key);}
 
-function sanitizeProgress(input){
-  const raw=input&&typeof input==='object'?input:{};
-  const state={schema:2,cards:{},streak:0,lastDay:null,sessions:0,passedExams:[]};
-  state.streak=Math.max(0,Math.min(10000,Math.round(Number(raw.streak)||0)));
-  state.sessions=Math.max(0,Math.min(100000,Math.round(Number(raw.sessions)||0)));
-  state.lastDay=typeof raw.lastDay==='string'?raw.lastDay.slice(0,10):null;
-  const entries=Object.entries(raw.cards&&typeof raw.cards==='object'?raw.cards:{}).slice(0,500);
-  entries.forEach(([id,value])=>{
+function clampNumber(value,low,high,fallback){
+  const number=Number(value);
+  return Number.isFinite(number)?Math.max(low,Math.min(high,number)):fallback;
+}
+function clampCount(value,high){
+  return Math.max(0,Math.min(high,Math.round(Number(value)||0)));
+}
+/* Wspólny kształt powtórek: używa go M1 (słowa), M2 (wzorce) i M5 (błędy). */
+function sanitizeCardMap(raw,limit){
+  const out={};
+  Object.entries(raw&&typeof raw==='object'?raw:{}).slice(0,limit).forEach(([id,value])=>{
     if(typeof id!=='string'||id.length>120||!value||typeof value!=='object')return;
-    state.cards[id]={
-      i:Math.max(0,Math.min(365,Math.round(Number(value.i)||0))),
-      e:Math.max(1.3,Math.min(2.6,Number(value.e)||2.2)),d:Math.max(0,Number(value.d)||0),
-      r:Math.max(0,Math.min(10000,Math.round(Number(value.r)||0))),
-      ok:Math.max(0,Math.min(100000,Math.round(Number(value.ok)||0))),
-      bad:Math.max(0,Math.min(100000,Math.round(Number(value.bad)||0)))
+    out[id]={
+      i:clampCount(value.i,365),
+      e:clampNumber(value.e,1.3,2.6,2.2),
+      d:Math.max(0,Number(value.d)||0),
+      r:clampCount(value.r,10000),
+      ok:clampCount(value.ok,100000),
+      bad:clampCount(value.bad,100000)
     };
   });
+  return out;
+}
+function sanitizeDoneMap(raw,limit){
+  const out={};
+  Object.entries(raw&&typeof raw==='object'?raw:{}).slice(0,limit).forEach(([id,value])=>{
+    if(typeof id!=='string'||id.length>120||!value||typeof value!=='object')return;
+    out[id]={done:clampCount(value.done,10000),ok:clampCount(value.ok,10000)};
+  });
+  return out;
+}
+function sanitizeProgress(input){
+  const raw=input&&typeof input==='object'?input:{};
+  const state={schema:3,cards:{},streak:0,lastDay:null,sessions:0,passedExams:[],
+    patterns:{},errorCards:{},stories:{},dialogues:{},
+    mistakes:[],feathers:0,badges:[],stages:0};
+  state.streak=clampCount(raw.streak,10000);
+  state.sessions=clampCount(raw.sessions,100000);
+  state.stages=clampCount(raw.stages,1000000);
+  state.feathers=clampCount(raw.feathers,1000000);
+  state.lastDay=typeof raw.lastDay==='string'?raw.lastDay.slice(0,10):null;
+  state.cards=sanitizeCardMap(raw.cards,500);
+  state.patterns=sanitizeCardMap(raw.patterns,200);
+  state.errorCards=sanitizeCardMap(raw.errorCards,200);
+  state.stories=sanitizeDoneMap(raw.stories,100);
+  state.dialogues=sanitizeDoneMap(raw.dialogues,100);
   const passed=Array.isArray(raw.passedExams)?raw.passedExams:[];
   state.passedExams=SECTION_IDS.filter(id=>passed.includes(id));
+  const badges=Array.isArray(raw.badges)?raw.badges:[];
+  state.badges=badges.filter(id=>typeof id==='string'&&id.length<=40).slice(0,40);
+  /* Rejestr błędów zasila M5. Trzymamy tylko ostatnie 60 i tylko pola,
+     których moduł faktycznie używa. */
+  const mistakes=Array.isArray(raw.mistakes)?raw.mistakes.slice(-60):[];
+  state.mistakes=mistakes.filter(item=>item&&typeof item==='object').map(item=>({
+    kind:String(item.kind||'').slice(0,20),
+    ref:String(item.ref||'').slice(0,120),
+    at:Math.max(0,Number(item.at)||0)
+  }));
   return state;
 }
 
 const STATIC_FILES={
   '/':'index.html','/index.html':'index.html','/app.js':'app.js','/words.js':'words.js','/styles.css':'styles.css',
+  '/patterns.js':'patterns.js','/stories.js':'stories.js','/dialogues.js':'dialogues.js',
+  '/errors.js':'errors.js','/journey.js':'journey.js',
   '/sw.js':'sw.js','/manifest.webmanifest':'manifest.webmanifest','/icon-192.png':'icon-192.png',
   '/icon-512.png':'icon-512.png','/icon-maskable.png':'icon-maskable.png'
 };

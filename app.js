@@ -1,11 +1,50 @@
 'use strict';
 
-const APP_VERSION = '10.5';
+const APP_VERSION = '11.0';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
 const MAX_SESSION_ITEMS = 20;
-const SESSION_LIMIT = 5*60*1000;
+
+/* Sesja ma cztery etapy i twardy limit 25 minut. Dwadzieścia pięć minut
+   jednego typu zadania to dla dziesięciolatki za dużo: po kilkunastu
+   minutach spada jakość odpowiedzi, więc utrwala się byle jakie wykonanie.
+   Stąd podział na etapy i ekran przejściowy między nimi. */
+const SESSION_LIMIT = 25*60*1000;
+const SHORT_LIMIT = 8*60*1000;
+const STAGE_PLAN = [
+  { id:'warmup',  name:'Rozgrzewka',   ms: 5*60*1000, short: 3*60*1000 },
+  { id:'core',    name:'Rdzeń',        ms:12*60*1000, short: 5*60*1000 },
+  { id:'closing', name:'Domknięcie',   ms: 6*60*1000, short: 0 }
+];
+
+const PATTERN_LIST = (window.PATTERNS || []);
+const PATTERN_ITEMS = PATTERN_LIST.flatMap(pattern =>
+  pattern.items.map((item, index) => ({ ...item, id: pattern.id+'#'+index, pattern: pattern.id, patternName: pattern.name, example: pattern.example })));
+const STORY_LIST = (window.STORIES || []);
+const DIALOGUE_LIST = (window.DIALOGUES || []);
+const ERROR_ITEMS = (window.ERROR_BANK || []);
+const COMPARE_ITEMS = (window.COMPARISONS || []);
+const ORDER_ITEMS = (window.ORDERINGS || []);
+const JOURNEY_STOPS = (window.JOURNEY || []);
+
+const BADGES = [
+  { id:'first-hundred', name:'Pierwsza setka',  desc:'100 słów w kolekcji',                    test: state => collectedTotal(state) >= 100 },
+  { id:'flawless',      name:'Bez potknięcia',  desc:'egzamin sekcji bez ani jednego błędu',   manual: true },
+  { id:'detective',     name:'Detektyw',        desc:'20 poprawionych i uzasadnionych błędów', test: state => countOk(state.errorCards) >= 20 },
+  { id:'speaker',       name:'Rozmówca',        desc:'30 pełnych zdań powiedzianych na głos',  test: state => countOk(state.dialogues) >= 30 },
+  { id:'golden-word',   name:'Złote słowo',     desc:'słowo utrwalone do końca',               test: state => Object.values(state.cards).some(card => card.i >= 35) },
+  { id:'builder',       name:'Budowniczy zdań', desc:'50 zdań ułożonych bez błędu',            test: state => countOk(state.patterns) >= 50 },
+  { id:'persistent',    name:'Wytrwałość',      desc:'7 dni z rzędu',                          test: state => state.streak >= 7 }
+];
+
+const DAILY_CHALLENGES = [
+  { id:'d-sentences', text:'Dziś ułóż pięć zdań bez błędu.',                  goal:5, counter:'patternPerfect' },
+  { id:'d-speak',     text:'Dziś powiedz trzy pełne zdania na głos.',         goal:3, counter:'spoken' },
+  { id:'d-words',     text:'Dziś dodaj do kolekcji trzy nowe słowa.',         goal:3, counter:'newWords' },
+  { id:'d-detective', text:'Dziś znajdź i uzasadnij dwa błędy.',              goal:2, counter:'errorsFixed' },
+  { id:'d-story',     text:'Dziś przeczytaj jedną historyjkę do końca.',      goal:1, counter:'stories' }
+];
 const PRAISES = ['Good job','Well done','You are doing great','Keep it going','You are the best','Nice','Great'];
 
 const SECTIONS = (window.WORD_SECTIONS || []).map((section, sectionIndex) => ({
@@ -79,7 +118,21 @@ let syncTimer = null;
 let syncRevision = 0;
 
 function emptyState(){
-  return {schema:2,cards:{},streak:0,lastDay:null,sessions:0,passedExams:[]};
+  return {schema:3,cards:{},streak:0,lastDay:null,sessions:0,passedExams:[],
+    patterns:{},errorCards:{},stories:{},dialogues:{},
+    mistakes:[],feathers:0,badges:[],stages:0};
+}
+
+function collectedTotal(state){ return Object.keys(state.cards||{}).length; }
+function countOk(map){ return Object.values(map||{}).reduce((sum,item)=>sum+(item.ok||0),0); }
+
+/* Rejestr błędów. Powstaje już teraz, przy M2 i M4, choć korzysta z niego
+   dopiero M5: gdyby dokładać go później, bank byłby przez pierwsze
+   tygodnie pusty i moduł detektywa wystartowałby bez materiału. */
+function noteMistake(kind,ref){
+  if(!S.mistakes) S.mistakes=[];
+  S.mistakes.push({kind:String(kind),ref:String(ref),at:Date.now()});
+  if(S.mistakes.length>60) S.mistakes=S.mistakes.slice(-60);
 }
 
 function normalizeState(raw){
@@ -100,6 +153,38 @@ function normalizeState(raw){
   }
   const passed = Array.isArray(raw.passedExams) ? raw.passedExams : [];
   state.passedExams = SECTIONS.map(s=>s.id).filter(id=>passed.includes(id));
+
+  const copyCards = (source,allowed) => {
+    const out = {};
+    Object.entries(source && typeof source === 'object' ? source : {}).forEach(([id,value]) => {
+      if(!allowed.has(id) || !value || typeof value !== 'object') return;
+      out[id] = {
+        i:clampInt(value.i,0,365), e:Math.max(1.3,Math.min(2.6,Number(value.e)||2.2)),
+        d:Math.max(0,Number(value.d)||0), r:clampInt(value.r,0,10000),
+        ok:clampInt(value.ok,0,100000), bad:clampInt(value.bad,0,100000)
+      };
+    });
+    return out;
+  };
+  const copyDone = (source,allowed) => {
+    const out = {};
+    Object.entries(source && typeof source === 'object' ? source : {}).forEach(([id,value]) => {
+      if(!allowed.has(id) || !value || typeof value !== 'object') return;
+      out[id] = { done:clampInt(value.done,0,10000), ok:clampInt(value.ok,0,10000) };
+    });
+    return out;
+  };
+  state.patterns   = copyCards(raw.patterns,   new Set(PATTERN_ITEMS.map(item=>item.id)));
+  state.errorCards = copyCards(raw.errorCards, new Set(ERROR_ITEMS.map(item=>item.id)));
+  state.stories    = copyDone(raw.stories,     new Set(STORY_LIST.map(item=>item.id)));
+  state.dialogues  = copyDone(raw.dialogues,   new Set(DIALOGUE_LIST.map(item=>item.id)));
+  state.feathers   = clampInt(raw.feathers,0,1000000);
+  state.stages     = clampInt(raw.stages,0,1000000);
+  const badgeIds = new Set(BADGES.map(badge=>badge.id));
+  state.badges = (Array.isArray(raw.badges)?raw.badges:[]).filter(id=>badgeIds.has(id));
+  state.mistakes = (Array.isArray(raw.mistakes)?raw.mistakes.slice(-60):[])
+    .filter(item=>item && typeof item === 'object')
+    .map(item=>({kind:String(item.kind||''),ref:String(item.ref||''),at:Math.max(0,Number(item.at)||0)}));
   return state;
 }
 
@@ -324,14 +409,16 @@ function listen(target,callback){
     recognition.onresult=event=>{
       const alternatives=Array.from(event.results[0]||[]).map(item=>item&&item.transcript||'').filter(Boolean);
       const ok=alternatives.some(text=>pronunciationMatches(text,target));
+      const raw=alternatives.find(text=>!containsBlockedWord(text))||'';
       // Przy trafieniu pokazujemy szukane slowo, nie surowa transkrypcje.
       // Przy pudle nie pokazujemy nic: dziecko nie ma powodu widziec,
       // ze silnik uslyszal cokolwiek innego, w tym wulgaryzm.
-      if(ok)return finish({ok:true,text:target});
+      if(ok)return finish({ok:true,text:target,raw:raw});
       const heardSomething=alternatives.length>0&&!alternatives.every(containsBlockedWord);
       finish({
         ok:false,
         text:'',
+        raw:raw,
         msg:heardSomething?'To brzmiało jak inne słowo. Posłuchaj i spróbuj ponownie.':'Nie rozpoznałem słowa. Posłuchaj i spróbuj ponownie.'
       });
     };
@@ -365,6 +452,9 @@ function renderHome(){
   $('#allCollected').textContent=collected;
   $('#passedN').textContent=passed;
   $('#openN').textContent=open;
+  $('#featherN').textContent=S.feathers||0;
+  const challenge=challengeProgress();
+  $('#challengeLine').textContent=challenge?('Wyzwanie dnia: '+challenge.challenge.text):'';
   const grid=$('#sectionsGrid'); grid.textContent='';
   SECTIONS.forEach((section,index)=>{
     const count=sectionCollected(index);
@@ -413,12 +503,18 @@ function renderSection(index){
     button.textContent='Zdaj egzamin'; button.addEventListener('click',()=>startExam(index));
   }else if(passed){
     note.textContent=index===SECTIONS.length-1?'Cały kurs ukończony. Możesz nadal utrwalać słowa.':'Ta sekcja jest ukończona. Kolejna została odblokowana.';
-    button.textContent='Powtórz słowa'; button.addEventListener('click',startLearning);
+    button.textContent='Powtórz słowa'; button.addEventListener('click',()=>beginSession(false));
   }else{
     note.textContent='Nowe słowo trafia do kolekcji dopiero po poprawnej wymowie i wpisaniu.';
-    button.textContent=count?'Kontynuuj naukę':'Rozpocznij naukę'; button.addEventListener('click',startLearning);
+    button.textContent=count?'Kontynuuj naukę':'Rozpocznij naukę'; button.addEventListener('click',()=>beginSession(false));
   }
   action.append(note,button);
+  if(!passed){
+    const quick=make('button','secondary wide','Mam tylko chwilę (8 minut)');
+    quick.type='button';
+    quick.addEventListener('click',()=>beginSession(true));
+    action.append(quick);
+  }
   /* Tryb testowy nie omija bramki egzaminu: uzupelnia sekcje do 20 slow,
      po czym egzamin otwiera sie normalna droga, tak jak u ucznia. */
   if(inTestMode() && count<20){
@@ -463,9 +559,133 @@ function startLearning(){
       for(let i=0;i<3&&reviews.length;i++) queue.push(reviews.shift());
     }
   }
-  done=0;hits=0;added=[];startedAt=Date.now();sessionRun++;
-  $('#playSectionName').textContent=SECTIONS[currentSectionIndex].name;
-  show('play'); nextStep();
+  return queue;
+}
+
+/* ==================== SESJA CZTEROETAPOWA ==================== */
+
+let stagePlan = [], stageIndex = 0, stageStartedAt = 0, shortSession = false;
+
+function wordQueue(){ return startLearning(); }
+
+function patternQueue(limit){
+  const pool = PATTERN_ITEMS.filter(item => dueIn(S.patterns,item.id));
+  const fresh = PATTERN_ITEMS.filter(item => !S.patterns[item.id]);
+  const chosen = shuffle(pool.length ? pool : fresh).slice(0,limit);
+  return chosen.map(item => ({mode:'pattern',item}));
+}
+function storyQueue(limit){
+  const unseen = STORY_LIST.filter(story => !(S.stories[story.id] || {}).done);
+  const pool = unseen.length ? unseen : STORY_LIST;
+  return shuffle(pool).slice(0,limit).map(story => ({mode:'story',item:story}));
+}
+function dialogueQueue(limit){
+  const unseen = DIALOGUE_LIST.filter(dialogue => !(S.dialogues[dialogue.id] || {}).done);
+  const pool = unseen.length ? unseen : DIALOGUE_LIST;
+  return shuffle(pool).slice(0,limit).map(dialogue => ({mode:'dialogue',item:dialogue}));
+}
+
+/* M5 czerpie przede wszystkim z WŁASNYCH błędów uczennicy. Bank startowy
+   uzupełnia tylko to, czego jeszcze nie ma z czego zbudować. */
+function detectiveQueue(limit){
+  const mistakePatterns = new Set((S.mistakes||[]).filter(item=>item.kind==='pattern').map(item=>item.ref));
+  const ownErrors = ERROR_ITEMS.filter(item => dueIn(S.errorCards,item.id));
+  const items = [];
+  shuffle(ownErrors).slice(0,limit).forEach(item => items.push({mode:'error',item}));
+  if(mistakePatterns.size){
+    const repeat = PATTERN_ITEMS.filter(item => mistakePatterns.has(item.id));
+    shuffle(repeat).slice(0,2).forEach(item => items.push({mode:'pattern',item}));
+  }
+  if(COMPARE_ITEMS.length) items.push({mode:'compare',item:shuffle(COMPARE_ITEMS.slice())[0]});
+  if(ORDER_ITEMS.length) items.push({mode:'ordering',item:shuffle(ORDER_ITEMS.slice())[0]});
+  return shuffle(items).slice(0,limit+2);
+}
+
+function unlockedModules(){
+  const collected = collectedTotal(S);
+  return {
+    patterns: collected >= 12,
+    stories: collected >= 25 && countOk(S.patterns) >= 5,
+    dialogues: collected >= 40 && countOk(S.patterns) >= 12,
+    detective: countOk(S.patterns) >= 20 || (S.mistakes||[]).length >= 6
+  };
+}
+
+/* Rdzeń miesza typy zadań zamiast trzymać jeden: sesja z jednego rodzaju
+   ćwiczenia daje lepsze wyniki w trakcie i gorsze po tygodniu. */
+function buildStage(id){
+  const open = unlockedModules();
+  if(id === 'warmup') return wordQueue();
+  if(id === 'core'){
+    const items = [];
+    if(open.patterns) items.push(...patternQueue(shortSession ? 3 : 6));
+    if(open.stories && !shortSession) items.push(...storyQueue(1));
+    if(open.dialogues && !shortSession) items.push(...dialogueQueue(1));
+    if(!items.length) return wordQueue();
+    const words = wordQueue().slice(0,shortSession ? 3 : 6);
+    const mixed = [];
+    while(items.length || words.length){
+      if(items.length) mixed.push(items.shift());
+      if(words.length) mixed.push(words.shift());
+      if(items.length) mixed.push(items.shift());
+    }
+    return mixed;
+  }
+  if(id === 'closing'){
+    if(open.detective) return detectiveQueue(4);
+    return wordQueue().slice(0,6);
+  }
+  return [];
+}
+
+function beginSession(short){
+  shortSession = Boolean(short);
+  stagePlan = STAGE_PLAN.filter(stage => !shortSession || stage.short > 0);
+  stageIndex = 0;
+  done = 0; hits = 0; added = []; sessionRun++;
+  startedAt = Date.now();
+  dailyCounters = {};
+  startStage();
+}
+
+function stageBudget(stage){ return shortSession ? stage.short : stage.ms; }
+
+function startStage(){
+  const stage = stagePlan[stageIndex];
+  if(!stage) return finishLearning();
+  queue = buildStage(stage.id);
+  if(!queue.length){ stageIndex++; return startStage(); }
+  stageStartedAt = Date.now();
+  $('#playSectionName').textContent = stage.name + ' · ' + SECTIONS[currentSectionIndex].name;
+  show('play');
+  nextStep();
+}
+
+function endStage(){
+  S.stages = (S.stages||0) + 1;
+  saveProgress();
+  stageIndex++;
+  if(stageIndex >= stagePlan.length) return finishLearning();
+  renderStageBreak();
+}
+
+/* Ekran przejściowy nie jest ozdobnikiem: krótka przerwa poznawcza
+   między blokami różnych zadań poprawia to, co z nich zostaje. */
+function renderStageBreak(){
+  const next = stagePlan[stageIndex];
+  const host = $('#breakBody');
+  host.textContent = '';
+  const stop = JOURNEY_STOPS[journeyIndex()];
+  if(stop){
+    host.append(make('p','break-place',stop.place + ', ' + stop.country));
+    host.append(make('p','break-fact',stop.fact));
+  }
+  host.append(make('p','break-next','Następny etap: ' + next.name));
+  const progress = challengeProgress();
+  if(progress) host.append(make('p','break-challenge',
+    progress.challenge.text + '  (' + Math.min(progress.done,progress.challenge.goal) + ' z ' + progress.challenge.goal + ')'));
+  $('#breakFeathers').textContent = S.feathers || 0;
+  show('break');
 }
 
 function updateLearningProgress(){
@@ -476,12 +696,23 @@ function updateLearningProgress(){
 
 function nextStep(){
   clearTimeout(advanceTimer); updateLearningProgress();
-  if(!queue.length||((Date.now()-startedAt)>SESSION_LIMIT&&done>=8)) return finishLearning();
-  const item=queue.shift();
-  const stage=$('#stage'); stage.textContent='';
-  if(item.mode==='intro') renderIntro(stage,item);
-  else if(item.mode==='type-word') renderType(stage,item);
-  else renderChoice(stage,item);
+  const totalOver = (Date.now()-startedAt) > (shortSession ? SHORT_LIMIT : SESSION_LIMIT);
+  if(totalOver) return finishLearning();
+  const current = stagePlan[stageIndex];
+  const stageOver = current && (Date.now()-stageStartedAt) > stageBudget(current);
+  if(!queue.length || stageOver) return endStage();
+
+  const item = queue.shift();
+  const stage = $('#stage'); stage.textContent = '';
+  if(item.mode==='intro') return renderIntro(stage,item);
+  if(item.mode==='type-word') return renderType(stage,item);
+  if(item.mode==='pattern') return renderPattern(stage,item.item);
+  if(item.mode==='story') return renderStory(stage,item.item);
+  if(item.mode==='dialogue') return renderDialogue(stage,item.item,0);
+  if(item.mode==='error') return renderErrorHunt(stage,item.item);
+  if(item.mode==='compare') return renderCompare(stage,item.item);
+  if(item.mode==='ordering') return renderOrdering(stage,item.item);
+  return renderChoice(stage,item);
 }
 
 function renderIntro(stage,item){
@@ -590,22 +821,46 @@ function answerChoice(button,container,correct,card){
 }
 
 function finishLearning(){
-  touchStreak();S.sessions++;saveProgress();
-  const count=sectionCollected(currentSectionIndex);
-  $('#dNew').textContent=added.length;$('#dOk').textContent=hits;$('#dSection').textContent=count;
-  $('#doneTitle').textContent=added.length?'Kolekcja rośnie!':'Powtórka zakończona!';
-  const list=$('#dList');list.textContent='';added.forEach(card=>list.append(make('span','',card.ic+' '+card.en)));
-  const action=$('#doneAction');action.textContent='';
-  if(count===20&&!sectionPassed(currentSectionIndex)){
-    const button=make('button','primary wide','Zdaj egzamin');button.type='button';button.addEventListener('click',()=>startExam(currentSectionIndex));action.append(button);
+  stopSpeech(); clearTimeout(advanceTimer);
+  touchStreak(); S.sessions++;
+  const earned = checkBadges();
+  saveProgress();
+
+  const count = sectionCollected(currentSectionIndex);
+  $('#dNew').textContent = added.length;
+  $('#dOk').textContent = hits;
+  $('#dSection').textContent = count;
+  $('#dFeathers').textContent = S.feathers || 0;
+  $('#doneTitle').textContent = added.length ? 'Kolekcja rośnie!' : 'Sesja zakończona!';
+
+  const list = $('#dList'); list.textContent = '';
+  added.forEach(card => list.append(make('span','',card.ic+' '+card.en)));
+  earned.forEach(badge => list.append(make('span','badge-chip','🏅 '+badge.name)));
+
+  const progress = challengeProgress();
+  const note = $('#doneChallenge');
+  if(progress){
+    note.textContent = progress.complete
+      ? 'Wyzwanie dnia wykonane: ' + progress.challenge.text
+      : progress.challenge.text + '  (' + Math.min(progress.done,progress.challenge.goal) + ' z ' + progress.challenge.goal + ')';
+    note.className = progress.complete ? 'done-challenge good' : 'done-challenge';
+  }else note.textContent = '';
+
+  const action = $('#doneAction'); action.textContent = '';
+  if(count === 20 && !sectionPassed(currentSectionIndex)){
+    const button = make('button','primary wide','Zdaj egzamin'); button.type = 'button';
+    button.addEventListener('click',()=>startExam(currentSectionIndex));
+    action.append(button);
   }
+  announceBadges(earned);
   show('done');
 }
 
 /* ==================== EGZAMIN 4 × 5 ==================== */
-let examDeck=[],examRoundIndex=0,examMatched=new Set(),selectedImage=null,selectedWord=null,examBusy=false;
+let examDeck=[],examRoundIndex=0,examMatched=new Set(),selectedImage=null,selectedWord=null,examBusy=false,examMisses=0;
 
 function startExam(index){
+  examMisses=0;
   if(index>=openSectionCount()||sectionCollected(index)!==20){toast('Najpierw zbierz wszystkie 20 słów.');return;}
   currentSectionIndex=index;examDeck=shuffle(SECTIONS[index].cards);examRoundIndex=0;
   $('#examSectionName').textContent=SECTIONS[index].name;$('#examTitle').textContent=SECTIONS[index].name;
@@ -666,6 +921,7 @@ function selectMatch(kind,card,button){
     selectedImage.button.classList.add('wrong');selectedWord.button.classList.add('wrong');
     feedback.textContent='Try again';feedback.className='exam-feedback bad';
     const spoken=selectedWord.card.en;
+    examMisses++;
     speakSequence([spoken,'Try again'],()=>{
       clearSelection('image');clearSelection('word');selectedImage=null;selectedWord=null;examBusy=false;
     });
@@ -675,13 +931,28 @@ function selectMatch(kind,card,button){
 function advanceExam(){
   examRoundIndex++;
   if(examRoundIndex<4)return renderExamRound();
-  if(!sectionPassed(currentSectionIndex))S.passedExams.push(SECTIONS[currentSectionIndex].id);
-  touchStreak();saveProgress();
+  const firstTime = !sectionPassed(currentSectionIndex);
+  if(firstTime) S.passedExams.push(SECTIONS[currentSectionIndex].id);
+  touchStreak();
+  const earned = [];
+  if(firstTime){
+    award('examPerfect');
+    if(examMisses === 0){ const badge = grantBadge('flawless'); if(badge) earned.push(badge); }
+  }
+  earned.push(...checkBadges());
+  saveProgress();
   $('#examProgress').style.width='100%';$('#matchBoard').hidden=true;$('#examFeedback').textContent='';
   const complete=$('#examComplete');complete.hidden=false;complete.textContent='';
   complete.append(make('div','celebrate','🏆'),make('h1','','Egzamin zdany!'));
   const message=currentSectionIndex<SECTIONS.length-1?'Nowa sekcja została odblokowana.':'Brawo! Wszystkie 25 sekcji zostało ukończonych.';
   complete.append(make('p','',message));
+  const stop = JOURNEY_STOPS[journeyIndex()];
+  if(stop){
+    complete.append(make('p','break-place','Jerzyk doleciał do: '+stop.place+', '+stop.country));
+    complete.append(make('p','break-fact',stop.fact));
+  }
+  if(examMisses === 0) complete.append(make('p','break-challenge','Egzamin bez ani jednej pomyłki.'));
+  announceBadges(earned);
   const button=make('button','primary wide',currentSectionIndex<SECTIONS.length-1?'Otwórz kolejną sekcję':'Wróć do sekcji');button.type='button';
   button.addEventListener('click',()=>renderSection(Math.min(currentSectionIndex+1,SECTIONS.length-1)));complete.append(button);
   speakSequence(['Good','Well done']);
@@ -808,3 +1079,643 @@ if('serviceWorker' in navigator&&location.protocol==='https:'){
   window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{}));
 }
 boot();
+
+/* ==================== NAGRODY ==================== */
+
+/* Piórka wyłącznie za rzeczy trudne, nigdy za czas spędzony w aplikacji.
+   Nagradzanie samej obecności uczy przesiadywania, nie uczenia się. */
+const FEATHER_VALUES = { patternPerfect:2, errorFixed:3, examPerfect:10, dialogueTurn:2, storyDetail:1, newWord:1 };
+let dailyCounters = {};
+
+function award(kind,times){
+  const value = FEATHER_VALUES[kind] || 0;
+  S.feathers = (S.feathers||0) + value*(times||1);
+  dailyCounters[kind] = (dailyCounters[kind]||0) + (times||1);
+}
+
+function todaysChallenge(){
+  if(!DAILY_CHALLENGES.length) return null;
+  const day = Math.floor(Date.now()/DAY);
+  return DAILY_CHALLENGES[day % DAILY_CHALLENGES.length];
+}
+function challengeProgress(){
+  const challenge = todaysChallenge();
+  if(!challenge) return null;
+  const map = { patternPerfect:'patternPerfect', spoken:'dialogueTurn', newWords:'newWord', errorsFixed:'errorFixed', stories:'storyDetail' };
+  const done = dailyCounters[map[challenge.counter]] || 0;
+  return { challenge, done, complete: done >= challenge.goal };
+}
+
+/* Odznaki za konkretne dokonania, nie za frekwencję. */
+function checkBadges(){
+  const earned = [];
+  BADGES.forEach(badge => {
+    if(S.badges.includes(badge.id) || badge.manual || !badge.test) return;
+    if(badge.test(S)){ S.badges.push(badge.id); earned.push(badge); }
+  });
+  return earned;
+}
+function grantBadge(id){
+  const badge = BADGES.find(item => item.id === id);
+  if(!badge || S.badges.includes(id)) return null;
+  S.badges.push(id);
+  return badge;
+}
+function announceBadges(list){
+  list.forEach((badge,index) => setTimeout(()=>toast('Nowa odznaka: '+badge.name),600*(index+1)));
+}
+
+/* Postęp wyprawy wynika z liczby zdanych egzaminów, więc nie trzeba
+   przechowywać go osobno i nie da się rozjechać ze stanem sekcji. */
+function journeyIndex(){ return Math.min(JOURNEY_STOPS.length-1, S.passedExams.length); }
+
+/* ==================== POWTÓRKI DLA WZORCÓW I BŁĘDÓW ==================== */
+
+function gradeIn(map,id,correct){
+  const card = map[id] || (map[id] = {i:0,e:2.2,d:0,r:0,ok:0,bad:0});
+  if(correct){
+    card.ok++; card.r++; card.e = Math.min(2.6, card.e+0.05);
+    card.i = Math.round(STEPS[Math.min(card.r-1,STEPS.length-1)] * (card.e/2.2));
+    card.d = Date.now() + card.i*DAY;
+  }else{
+    card.bad++; card.r = Math.max(0,card.r-2); card.e = Math.max(1.3,card.e-0.15);
+    card.i = 0; card.d = Date.now();
+  }
+  return card;
+}
+function dueIn(map,id){ const card = map[id]; return !card || card.d <= Date.now(); }
+
+function normalizeAnswer(value){
+  return String(value||'').toLowerCase()
+    .replace(/[\u2019']/g,'')
+    .replace(/[^a-z0-9\s]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+/* Ocena wypowiedzi w M4 i M5: liczy się obecność elementów kluczowych,
+   nie identyczność z wzorcem. `need` to lista list, z każdej musi trafić
+   przynajmniej jeden wariant. */
+function answerCovers(answer,need){
+  const text = normalizeAnswer(answer);
+  if(!text) return false;
+  return (need||[]).every(group => group.some(token => text.includes(normalizeAnswer(token))));
+}
+function answerAvoids(answer,avoid){
+  const text = normalizeAnswer(answer);
+  return !(avoid||[]).some(token => text.includes(normalizeAnswer(token)));
+}
+
+/* ==================== M2: KLOCKI ZDAŃ ==================== */
+
+/* Trudność rośnie sama: na starcie tylko potrzebne klocki i widoczny wzór,
+   potem dochodzą klocki zbędne, na końcu wzór znika. Poziom liczy się
+   z liczby udanych powtórek tego konkretnego zdania. */
+function patternLevel(id){ return (S.patterns[id]||{}).r || 0; }
+
+function renderPattern(stage,item){
+  const level = patternLevel(item.id);
+  const useExtra = level >= 1;
+  const showHint = level < 2;
+
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Ułóż zdanie po angielsku'));
+  prompt.append(make('p','pattern-pl',item.pl));
+  if(showHint) prompt.append(make('p','pattern-hint','Przykład: '+item.example));
+  stage.append(prompt);
+
+  const line = make('div','sentence-line');
+  line.setAttribute('aria-label','Twoje zdanie');
+  stage.append(line);
+
+  const bank = make('div','brick-bank');
+  stage.append(bank);
+
+  const feedback = make('p','fb','');
+  stage.append(feedback);
+
+  const placed = [];
+  const target = item.tokens;
+  const pool = shuffle(useExtra ? target.concat(item.extra) : target.slice());
+
+  function refreshLine(){
+    line.textContent = '';
+    placed.forEach((token,index) => {
+      const brick = make('button','brick placed',token);
+      brick.type = 'button';
+      brick.addEventListener('click',()=>{
+        placed.splice(index,1);
+        const back = bank.querySelector('[data-token="'+cssEscape(token)+'"][disabled]');
+        if(back) back.disabled = false;
+        refreshLine(); refreshCheck();
+      });
+      line.append(brick);
+    });
+    if(!placed.length) line.append(make('span','line-empty','Dotknij klocków poniżej'));
+  }
+  function refreshCheck(){ checkButton.disabled = placed.length !== target.length; }
+
+  pool.forEach(token => {
+    const brick = make('button','brick',token);
+    brick.type = 'button';
+    brick.dataset.token = token;
+    brick.addEventListener('click',()=>{
+      if(placed.length >= target.length) return;
+      placed.push(token); brick.disabled = true;
+      refreshLine(); refreshCheck();
+    });
+    bank.append(brick);
+  });
+
+  const checkButton = make('button','next','Sprawdź');
+  checkButton.type = 'button';
+  checkButton.disabled = true;
+  stage.append(checkButton);
+
+  let attempts = 0;
+  checkButton.addEventListener('click',()=>{
+    const answer = placed.join(' ');
+    const correct = answer === target.join(' ');
+    if(correct){
+      feedback.className = 'fb good';
+      feedback.textContent = target.join(' ');
+      checkButton.disabled = true;
+      bank.querySelectorAll('.brick').forEach(brick => brick.disabled = true);
+      gradeIn(S.patterns,item.id,attempts === 0);
+      if(attempts === 0){ hits++; award('patternPerfect'); }
+      done++; saveProgress();
+      say(target.filter(token => token !== '?').join(' '));
+      clearTimeout(advanceTimer);
+      advanceTimer = setTimeout(nextStep,900);
+      return;
+    }
+    attempts++;
+    gradeIn(S.patterns,item.id,false);
+    noteMistake('pattern',item.id);
+    feedback.className = 'fb bad';
+    /* Podpowiedź kierunkowa, nie gotowa odpowiedź: dziecko ma poprawić samo. */
+    const firstWrong = placed.findIndex((token,index) => token !== target[index]);
+    feedback.textContent = attempts >= 2
+      ? 'Zacznij od: ' + target.slice(0,2).join(' ')
+      : (firstWrong >= 0 ? 'Pierwsze ' + (firstWrong) + ' słów jest dobrze. Dalej coś się nie zgadza.' : 'Czegoś brakuje.');
+    placed.length = 0;
+    bank.querySelectorAll('.brick').forEach(brick => brick.disabled = false);
+    refreshLine(); refreshCheck();
+  });
+
+  refreshLine();
+}
+function cssEscape(value){ return String(value).replace(/"/g,'\\"'); }
+
+/* ==================== M3: HISTORYJKI ==================== */
+
+function renderStory(stage,story){
+  const card = make('div','card story-card');
+  card.append(make('p','tag','Historyjka'));
+  card.append(make('h3','story-title',story.title));
+  const body = make('div','story-text');
+  story.text.forEach(sentence => {
+    const row = make('button','story-line',sentence);
+    row.type = 'button';
+    row.addEventListener('click',()=>say(sentence));
+    body.append(row);
+  });
+  card.append(body);
+  const listen = make('button','hear','Posłuchaj całości');
+  listen.type = 'button';
+  listen.addEventListener('click',()=>speakSequence(story.text,()=>{}));
+  card.append(listen);
+  stage.append(card);
+
+  const next = make('button','next','Przejdź do pytań');
+  next.type = 'button';
+  next.addEventListener('click',()=>{
+    stopSpeech();
+    stage.textContent = '';
+    renderStoryMain(stage,story);
+  });
+  stage.append(next);
+}
+
+function renderStoryMain(stage,story){
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Główna myśl'));
+  prompt.append(make('p','story-question',story.main.q));
+  stage.append(prompt);
+
+  const options = make('div','opts wide-opts');
+  shuffle(story.main.options.map((text,index)=>({text,index}))).forEach(option => {
+    const button = make('button','opt text-opt',option.text);
+    button.type = 'button';
+    button.addEventListener('click',()=>{
+      [...options.children].forEach(child => child.disabled = true);
+      const correct = option.index === story.main.correct;
+      button.classList.add(correct?'right':'wrong');
+      if(!correct){
+        const right = [...options.children].find(child => child.textContent === story.main.options[story.main.correct]);
+        if(right) right.classList.add('right');
+        noteMistake('story',story.id);
+      }else{ hits++; }
+      done++;
+      clearTimeout(advanceTimer);
+      advanceTimer = setTimeout(()=>{ stage.textContent=''; renderStoryDetail(stage,story,0); }, correct?800:1500);
+    });
+    options.append(button);
+  });
+  stage.append(options);
+}
+
+function renderStoryDetail(stage,story,index){
+  const question = story.detail[index];
+  if(!question){
+    const record = S.stories[story.id] || (S.stories[story.id] = {done:0,ok:0});
+    record.done++;
+    saveProgress();
+    return nextStep();
+  }
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Szczegół, pytanie '+(index+1)+' z '+story.detail.length));
+  prompt.append(make('p','story-question',question.q));
+  stage.append(prompt);
+
+  const recall = make('button','hear','Przypomnij historyjkę');
+  recall.type = 'button';
+  recall.addEventListener('click',()=>speakSequence(story.text,()=>{}));
+  stage.append(recall);
+
+  const input = document.createElement('input');
+  input.type = 'text'; input.className = 'inp'; input.placeholder = 'odpowiedz po angielsku';
+  input.autocapitalize = 'off'; input.autocomplete = 'off'; input.spellcheck = false;
+  input.setAttribute('autocorrect','off');
+  stage.append(input);
+
+  const feedback = make('p','fb','');
+  stage.append(feedback);
+
+  const check = make('button','next','Sprawdź');
+  check.type = 'button';
+  stage.append(check);
+
+  let attempts = 0;
+  function verify(){
+    const value = normalizeAnswer(input.value);
+    if(!value) return;
+    const ok = question.answers.some(answer => normalizeAnswer(answer) === value || value.includes(normalizeAnswer(answer)));
+    if(ok){
+      feedback.className = 'fb good'; feedback.textContent = 'Dobrze.';
+      input.disabled = true; check.disabled = true;
+      const record = S.stories[story.id] || (S.stories[story.id] = {done:0,ok:0});
+      record.ok++;
+      if(attempts === 0){ hits++; award('storyDetail'); }
+      done++; saveProgress();
+      clearTimeout(advanceTimer);
+      advanceTimer = setTimeout(()=>{ stage.textContent=''; renderStoryDetail(stage,story,index+1); },800);
+      return;
+    }
+    attempts++;
+    noteMistake('story',story.id);
+    feedback.className = 'fb bad';
+    feedback.textContent = attempts >= 2
+      ? 'Odpowiedź jest w historyjce. Posłuchaj jej jeszcze raz.'
+      : 'To nie to. Poszukaj w tekście.';
+    if(attempts >= 3){
+      feedback.textContent = 'Poprawna odpowiedź: ' + question.answers[0];
+      input.disabled = true; check.disabled = true;
+      done++;
+      clearTimeout(advanceTimer);
+      advanceTimer = setTimeout(()=>{ stage.textContent=''; renderStoryDetail(stage,story,index+1); },1800);
+    }
+  }
+  check.addEventListener('click',verify);
+  input.addEventListener('keydown',event=>{ if(event.key==='Enter'){ event.preventDefault(); verify(); } });
+  setTimeout(()=>input.focus(),130);
+}
+
+/* ==================== M4: SYTUACJE ==================== */
+
+function renderDialogue(stage,dialogue,turnIndex){
+  const turn = dialogue.turns[turnIndex];
+  if(!turn){
+    const record = S.dialogues[dialogue.id] || (S.dialogues[dialogue.id] = {done:0,ok:0});
+    record.done++;
+    saveProgress();
+    return nextStep();
+  }
+
+  const card = make('div','card dialogue-card');
+  card.append(make('p','tag',dialogue.title+' · '+(turnIndex+1)+' z '+dialogue.turns.length));
+  if(turnIndex === 0) card.append(make('p','dialogue-intro',dialogue.intro));
+  card.append(make('p','dialogue-ask',turn.ask));
+  const replay = make('button','hear','Posłuchaj pytania');
+  replay.type = 'button';
+  replay.addEventListener('click',()=>say(turn.ask));
+  card.append(replay);
+  stage.append(card);
+
+  const mic = make('div','mic');
+  const status = make('p','mic-status',turn.pl);
+  const speak = make('button','next','Odpowiedz na głos');
+  speak.type = 'button';
+  const heard = make('p','heard','');
+  mic.append(status,speak,heard);
+  stage.append(mic);
+
+  const record = S.dialogues[dialogue.id] || (S.dialogues[dialogue.id] = {done:0,ok:0});
+  let attempts = 0;
+
+  function accept(scored){
+    if(scored){ record.ok++; hits++; award('dialogueTurn'); }
+    done++; saveProgress();
+    clearTimeout(advanceTimer);
+    advanceTimer = setTimeout(()=>{ stage.textContent=''; renderDialogue(stage,dialogue,turnIndex+1); },900);
+  }
+
+  if(!hasSR){
+    status.textContent = 'Mikrofon niedostępny, więc wpisz odpowiedź.';
+    speak.remove();
+    const input = document.createElement('input');
+    input.type='text'; input.className='inp'; input.placeholder='odpowiedz pełnym zdaniem';
+    input.autocapitalize='off'; input.autocomplete='off'; input.spellcheck=false;
+    const check = make('button','next','Sprawdź');
+    check.type='button';
+    stage.append(input,check);
+    check.addEventListener('click',()=>{
+      const ok = answerCovers(input.value,turn.need) && answerAvoids(input.value,turn.avoid);
+      status.textContent = ok ? 'Dobrze.' : 'Wzór: '+turn.model;
+      if(!ok) noteMistake('dialogue',dialogue.id);
+      input.disabled = true; check.disabled = true;
+      accept(ok);
+    });
+    return;
+  }
+
+  speak.addEventListener('click',()=>{
+    speak.disabled = true; speak.textContent = 'Słucham…'; status.textContent = 'Mów teraz.'; heard.textContent = '';
+    listen(turn.model,result => {
+      speak.disabled = false;
+      /* Rozpoznawanie zwraca tu całe zdanie, więc nie porównujemy go ze
+         wzorcem, tylko sprawdzamy elementy kluczowe. */
+      const said = result.raw || '';
+      const shown = containsBlockedWord(said) ? '' : said;
+      const ok = answerCovers(said,turn.need) && answerAvoids(said,turn.avoid);
+      if(result.fatal){
+        status.textContent = result.msg || 'Mikrofon jest niedostępny.';
+        speak.textContent = 'Spróbuj jeszcze raz';
+        const skip = make('button','link','Pomiń i idź dalej');
+        skip.type='button';
+        skip.addEventListener('click',()=>accept(false));
+        mic.append(skip);
+        return;
+      }
+      if(ok){
+        mic.classList.add('good');
+        status.textContent = 'Dobra odpowiedź.';
+        heard.textContent = shown ? 'Usłyszałem: '+shown : '';
+        speak.textContent = 'Zaliczone'; speak.disabled = true;
+        return accept(attempts === 0);
+      }
+      attempts++;
+      noteMistake('dialogue',dialogue.id);
+      heard.textContent = shown ? 'Usłyszałem: '+shown : '';
+      if(attempts >= 2){
+        status.textContent = 'Wzór: '+turn.model;
+        say(turn.model);
+        speak.textContent = 'Powiedz według wzoru';
+      }else{
+        status.textContent = 'Prawie. Odpowiedz pełnym zdaniem.';
+        speak.textContent = 'Powiedz jeszcze raz';
+      }
+      if(attempts >= 3) accept(false);
+    });
+  });
+  setTimeout(()=>say(turn.ask),300);
+}
+
+/* ==================== M5: DETEKTYW ==================== */
+
+/* Trzy typy zadań. Samo wskazanie i poprawienie błędu to jeszcze nie
+   zaliczenie: dokument wymaga uzasadnienia, więc pełne zaliczenie daje
+   dopiero wybór właściwego wyjaśnienia. */
+function renderErrorHunt(stage,item){
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Znajdź błąd w zdaniu'));
+  stage.append(prompt);
+
+  const sentence = make('div','sentence-line');
+  item.wrong.forEach((token,index) => {
+    const word = make('button','brick',token);
+    word.type = 'button';
+    word.addEventListener('click',()=>pick(index,word));
+    sentence.append(word);
+  });
+  stage.append(sentence);
+
+  const feedback = make('p','fb','');
+  stage.append(feedback);
+
+  let found = false, attempts = 0;
+
+  function pick(index,button){
+    if(found) return;
+    if(index !== item.bad){
+      attempts++;
+      button.classList.add('wrong');
+      setTimeout(()=>button.classList.remove('wrong'),700);
+      feedback.className = 'fb bad';
+      feedback.textContent = 'To słowo jest w porządku. Szukaj dalej.';
+      gradeIn(S.errorCards,item.id,false);
+      return;
+    }
+    found = true;
+    button.classList.add('right');
+    feedback.className = 'fb good';
+    feedback.textContent = 'Poprawnie powinno być: ' + item.fix;
+    say(item.wrong.map((token,i)=>i===item.bad?item.fix:token).filter(t=>t!=='?').join(' '));
+    setTimeout(()=>askWhy(),900);
+  }
+
+  function askWhy(){
+    stage.textContent = '';
+    const head = make('div','prompt');
+    head.append(make('p','ask','Dlaczego tak jest?'));
+    head.append(make('p','story-question',item.wrong.join(' ')+'  →  '+item.fix));
+    stage.append(head);
+
+    const options = make('div','opts wide-opts');
+    shuffle(item.why.map((text,index)=>({text,index}))).forEach(option => {
+      const button = make('button','opt text-opt',option.text);
+      button.type = 'button';
+      button.addEventListener('click',()=>{
+        [...options.children].forEach(child => child.disabled = true);
+        const correct = option.index === item.correctWhy;
+        button.classList.add(correct?'right':'wrong');
+        if(!correct){
+          const right = [...options.children].find(child => child.textContent === item.why[item.correctWhy]);
+          if(right) right.classList.add('right');
+          noteMistake('why',item.id);
+        }
+        gradeIn(S.errorCards,item.id,correct && attempts === 0);
+        if(correct && attempts === 0){ hits++; award('errorFixed'); }
+        done++; saveProgress();
+        clearTimeout(advanceTimer);
+        advanceTimer = setTimeout(nextStep,correct?900:1900);
+      });
+      options.append(button);
+    });
+    stage.append(options);
+  }
+}
+
+function renderCompare(stage,item){
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Porównaj i odpowiedz pełnym zdaniem'));
+  stage.append(prompt);
+
+  const pair = make('div','compare-pair');
+  [item.left,item.right].forEach(side => {
+    const box = make('div','compare-side');
+    box.append(make('div','big',side.icon));
+    const line = make('button','story-line',side.text);
+    line.type = 'button';
+    line.addEventListener('click',()=>say(side.text));
+    box.append(line);
+    pair.append(box);
+  });
+  stage.append(pair);
+  stage.append(make('p','story-question',item.q));
+
+  const input = document.createElement('input');
+  input.type='text'; input.className='inp'; input.placeholder='napisz jedno zdanie';
+  input.autocapitalize='off'; input.autocomplete='off'; input.spellcheck=false;
+  stage.append(input);
+
+  const feedback = make('p','fb','');
+  const check = make('button','next','Sprawdź');
+  check.type='button';
+  stage.append(feedback,check);
+
+  let attempts = 0;
+  check.addEventListener('click',()=>{
+    const ok = answerCovers(input.value,item.need);
+    if(ok){
+      feedback.className='fb good'; feedback.textContent='Dobrze.';
+      input.disabled=true; check.disabled=true;
+      if(attempts===0) hits++;
+      done++; saveProgress();
+      say(item.model);
+      clearTimeout(advanceTimer);
+      advanceTimer=setTimeout(nextStep,1100);
+      return;
+    }
+    attempts++;
+    feedback.className='fb bad';
+    feedback.textContent = attempts>=2 ? ('Wzór: '+item.model) : 'Wymień w zdaniu obie rzeczy, które się różnią.';
+    if(attempts>=3){ input.disabled=true; check.disabled=true; done++; clearTimeout(advanceTimer); advanceTimer=setTimeout(nextStep,1600); }
+  });
+}
+
+function renderOrdering(stage,item){
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Ułóż zdania w dobrej kolejności'));
+  stage.append(prompt);
+
+  const chosen = [];
+  const target = item.order;
+  const list = make('div','order-list');
+  const bank = make('div','order-bank');
+  stage.append(list,bank);
+
+  const feedback = make('p','fb','');
+  const check = make('button','next','Sprawdź');
+  check.type='button'; check.disabled = true;
+  stage.append(feedback,check);
+
+  function refresh(){
+    list.textContent='';
+    chosen.forEach((index,position) => {
+      const row = make('button','order-row',(position+1)+'. '+item.lines[index]);
+      row.type='button';
+      row.addEventListener('click',()=>{
+        chosen.splice(position,1);
+        const back = bank.querySelector('[data-index="'+index+'"]');
+        if(back) back.disabled = false;
+        refresh();
+      });
+      list.append(row);
+    });
+    if(!chosen.length) list.append(make('span','line-empty','Dotknij zdań poniżej'));
+    check.disabled = chosen.length !== item.lines.length;
+  }
+
+  shuffle(item.lines.map((text,index)=>({text,index}))).forEach(entry => {
+    const row = make('button','order-row',entry.text);
+    row.type='button';
+    row.dataset.index = entry.index;
+    row.addEventListener('click',()=>{
+      chosen.push(entry.index); row.disabled = true; refresh();
+    });
+    bank.append(row);
+  });
+
+  let attempts = 0;
+  check.addEventListener('click',()=>{
+    const ok = chosen.join(',') === target.join(',');
+    if(ok){
+      feedback.className='fb good'; feedback.textContent='Dobrze.';
+      check.disabled=true;
+      if(attempts===0) hits++;
+      done++; saveProgress();
+      speakSequence(target.map(index=>item.lines[index]),()=>{});
+      clearTimeout(advanceTimer);
+      advanceTimer=setTimeout(nextStep,1200);
+      return;
+    }
+    attempts++;
+    feedback.className='fb bad';
+    const firstWrong = chosen.findIndex((value,index)=>value!==target[index]);
+    feedback.textContent = attempts>=2
+      ? 'Zacznij od: '+item.lines[target[0]]
+      : (firstWrong>=0 ? ('Pierwsze '+firstWrong+' zdań pasuje. Dalej coś się nie zgadza.') : 'Jeszcze nie ta kolejność.');
+    chosen.length=0;
+    bank.querySelectorAll('.order-row').forEach(row=>row.disabled=false);
+    refresh();
+  });
+  refresh();
+}
+
+/* ==================== EKRAN WYPRAWY ==================== */
+
+function renderMap(){
+  const index = journeyIndex();
+  $('#mapLead').textContent = 'Jerzyk jest na przystanku ' + (index+1) + ' z ' + JOURNEY_STOPS.length +
+    '. Każdy zdany egzamin przenosi go dalej.';
+  const list = $('#mapList');
+  list.textContent = '';
+  JOURNEY_STOPS.forEach((stop,position) => {
+    const reached = position <= index;
+    const row = make('li','map-stop' + (reached ? ' reached' : '') + (position === index ? ' current' : ''));
+    row.append(make('span','map-number',String(position+1)));
+    const body = make('div','map-body');
+    body.append(make('strong','',reached ? stop.place + ', ' + stop.country : 'Jeszcze przed nami'));
+    if(reached) body.append(make('span','map-fact',stop.fact));
+    row.append(body);
+    list.append(row);
+  });
+
+  const badges = $('#badgeList');
+  badges.textContent = '';
+  BADGES.forEach(badge => {
+    const owned = S.badges.includes(badge.id);
+    const chip = make('div','badge-card' + (owned ? ' owned' : ''));
+    chip.append(make('span','badge-icon',owned ? '🏅' : '🔒'));
+    chip.append(make('strong','',badge.name));
+    chip.append(make('span','badge-desc',badge.desc));
+    badges.append(chip);
+  });
+}
+
+/* ==================== PODPIĘCIA NOWYCH EKRANÓW ==================== */
+
+$('#breakContinue').addEventListener('click',()=>startStage());
+$('#breakStop').addEventListener('click',()=>finishLearning());
+$('#openMap').addEventListener('click',()=>{ renderMap(); show('map'); });
+$('#mapBack').addEventListener('click',()=>{ renderHome(); show('home'); });
