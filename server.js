@@ -238,7 +238,7 @@ function sanitizeProgress(input){
 
 const STATIC_FILES={
   '/':'index.html','/index.html':'index.html','/app.js':'app.js','/words.js':'words.js','/styles.css':'styles.css',
-  '/patterns.js':'patterns.js','/stories.js':'stories.js','/dialogues.js':'dialogues.js',
+  '/patterns.js':'patterns.js','/sentence-gen.js':'sentence-gen.js','/stories.js':'stories.js','/dialogues.js':'dialogues.js',
   '/errors.js':'errors.js','/journey.js':'journey.js',
   '/sw.js':'sw.js','/manifest.webmanifest':'manifest.webmanifest','/icon-192.png':'icon-192.png',
   '/icon-512.png':'icon-512.png','/icon-maskable.png':'icon-maskable.png'

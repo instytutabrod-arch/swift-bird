@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '11.13';
+const APP_VERSION = '11.14';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -1640,6 +1640,18 @@ function grammarSpeechText(token){
   return spoken[token]||token;
 }
 
+/* Klocki bez dźwięku, tylko wizualny wzór. Używane dla zdania-przykładu
+   w M2, żeby dźwięk pozostał wyłącznie na klockach do układania. */
+function appendSilentBricks(host,tokens,className='grammar-bricks'){
+  const row=make('span',className+' silent');
+  (tokens||[]).forEach(token=>{
+    const brick=make('span','grammar-brick'+(/^[?.!,]$/.test(token)?' punctuation':''),token);
+    row.append(brick);
+  });
+  host.append(row);
+  return row;
+}
+
 function appendGrammarBricks(host,tokens,className='grammar-bricks'){
   const row=make('span',className);
   (tokens||[]).forEach(token=>{
@@ -1721,7 +1733,9 @@ function renderPattern(stage,item){
   if(showHint){
     const hint=make('div','pattern-hint');
     hint.append(make('span','pattern-hint-label','Przykład'));
-    appendGrammarBricks(hint,grammarExampleTokens(item.example));
+    /* Klocki przykładu są nieme: dźwięk niosą klocki do układania.
+       Przykład służy tylko za wzór wizualny. */
+    appendSilentBricks(hint,grammarExampleTokens(item.example));
     prompt.append(hint);
   }
   stage.append(prompt);
@@ -1741,9 +1755,17 @@ function renderPattern(stage,item){
   stage.append(feedback);
 
   const placed = [];
-  const target = item.tokens;
+  /* Zdanie powstaje z generatora: kotwica na niskich poziomach, warianty
+     z kolekcji na wyższych. Gdy generator nie ma z czego złożyć sensownego
+     zdania, spada na sztywne item.tokens — zadanie zawsze się pojawi. */
+  let target = item.tokens;
+  let extraBricks = item.extra;
+  if(typeof SENTENCE_GEN !== 'undefined' && item.pattern){
+    const task = SENTENCE_GEN.makeSentenceTask(item.pattern, collectedVocabulary(), level);
+    if(task && task.tokens && task.tokens.length){ target = task.tokens; extraBricks = task.extra; }
+  }
   const sentenceText=sentenceTextFromTokens(target);
-  const pool = shuffle(useExtra ? target.concat(item.extra) : target.slice());
+  const pool = shuffle(useExtra ? target.concat(extraBricks) : target.slice());
   let reviewed = false;
   let arrangementReady = false;
   let spellingReady = false;
@@ -1800,9 +1822,19 @@ function renderPattern(stage,item){
   }
 
   pool.forEach(token => {
-    const brick = make('button','brick',token);
+    const brick = make('button','brick brick-audio',token);
     brick.type = 'button';
+    /* Klocek do układania wypowiada swoje słowo po dotknięciu. To on niesie
+       dźwięk, nie przykład na górze. Interpunkcja milczy. */
+    const isPunctuation=/^[?.!,]$/.test(token);
+    if(!isPunctuation){
+      const icon=make('span','brick-audio-icon','🔊');
+      icon.setAttribute('aria-hidden','true');
+      brick.append(icon);
+      brick.setAttribute('aria-label',token+', dotknij, aby ułożyć i usłyszeć');
+    }
     brick.addEventListener('click',()=>{
+      if(!isPunctuation) say(grammarSpeechText(token));
       if(placed.length >= target.length) return;
       placed.push({token,source:brick});brick.disabled=true;
       refreshLine(); refreshCheck();

@@ -449,3 +449,41 @@ test('warunek odznaki detektywa jest osiągalny', () => {
   const few = Object.fromEntries(Array.from({ length: 3 }, (_, i) => ['e' + i, { ok: 1 }]));
   assert.equal(tests.detective({ errorCards: few }), false, 'próg nie może być trywialny');
 });
+
+test('generator zdań tworzy sensowne warianty i zawsze zwraca zdanie', () => {
+  const gen = require('../sentence-gen');
+  const owned = new Set(['cat','dog','sister','ball','box','table','happy','sad','key','apple','bird','tree','book','desk']);
+
+  Object.keys(gen.TEMPLATES).forEach(patternId => {
+    // Poziom 0: zawsze kotwica, nigdy generator.
+    const anchor = gen.makeSentenceTask(patternId, owned, 0);
+    assert.ok(anchor && anchor.tokens.length >= 3, patternId + ': brak kotwicy');
+    assert.equal(anchor.fromGenerator, false, patternId + ': poziom 0 musi dać kotwicę');
+    assert.ok(/[?.!]/.test(anchor.tokens[anchor.tokens.length-1]), patternId + ': brak znaku końca');
+
+    // Wyższy poziom: zdanie nadal powstaje i jest strukturalnie poprawne.
+    for(let i = 0; i < 30; i++){
+      const task = gen.makeSentenceTask(patternId, owned, 4);
+      assert.ok(task && task.tokens.length >= 3, patternId + ': generator zwrócił puste');
+      const dup = task.extra.filter(e => task.tokens.includes(e));
+      assert.deepEqual(dup, [], patternId + ': pułapka dubluje poprawny klocek');
+    }
+  });
+
+  // Pusta kolekcja: generator nie ma z czego brać, ale kotwica ratuje.
+  const empty = gen.makeSentenceTask('have-got', new Set(), 5);
+  assert.ok(empty && empty.tokens.length >= 3, 'przy pustej kolekcji musi zadziałać kotwica');
+});
+
+test('M2: dźwięk niosą klocki do układania, nie klocki przykładu', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  // Klocki banku wołają say() po dotknięciu.
+  const bankBlock = app.slice(app.indexOf('pool.forEach(token =>'), app.indexOf('bank.append(brick);') + 30);
+  assert.match(bankBlock, /say\(grammarSpeechText\(token\)\)/, 'klocek do układania musi wypowiadać słowo');
+  assert.match(bankBlock, /brick-audio-icon/, 'klocek do układania potrzebuje ikony dźwięku');
+  // Przykład używa niemej wersji.
+  assert.match(app, /function appendSilentBricks/, 'brak niemej wersji klocków przykładu');
+  assert.match(app, /appendSilentBricks\(hint,grammarExampleTokens/, 'przykład musi używać niemych klocków');
+  // Generator jest wpięty w renderPattern.
+  assert.match(app, /SENTENCE_GEN\.makeSentenceTask\(item\.pattern/, 'generator nie jest wpięty do układania zdań');
+});
