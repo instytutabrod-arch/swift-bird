@@ -41,7 +41,10 @@ test('wszystkie stałe elementy używane przez aplikację istnieją w HTML', () 
 
 test('formularz logowania wymaga dokładnie 4 cyfr PIN-u', () => {
   const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
-  assert.match(html,/id="loginPin"[^>]*minlength="4"[^>]*maxlength="4"[^>]*pattern="\[0-9\]\{4\}"/);
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  assert.match(html,/id="studentLogin"[^>]*novalidate/);
+  assert.match(html,/id="loginPin"[^>]*inputmode="numeric"[^>]*maxlength="4"/);
+  assert.match(app,/PIN musi mieć dokładnie 4 cyfry/);
   assert.doesNotMatch(html,/6-cyfrow|6-cyfr/i);
 });
 
@@ -69,12 +72,13 @@ test('tryb testowy jest dostępny tylko dla sesji administratora', () => {
   // w konsoli przez ucznia nie wystarczy do wlaczenia pomijania.
   assert.match(app, /function inTestMode\(\)\{ return testMode && currentUser && currentUser\.role==='admin'; \}/);
 
-  // Przyciski pomijania powstaja tylko w trybie testowym, w trzech miejscach:
-  // wymowa, wpisywanie i runda egzaminu.
+  // Przyciski pomijania powstaja tylko w trybie testowym: wymowa słowa,
+  // wpisywanie słowa, przepisywanie i czytanie zdania oraz runda egzaminu.
   const skips = app.match(/inTestMode\(\)/g) || [];
   assert.ok(skips.length >= 6, 'zbyt mało miejsc sprawdzających tryb testowy: ' + skips.length);
   assert.match(app, /if\(inTestMode\(\)\) mic\.append\(makeSkip\('Pomiń wymowę'/);
   assert.match(app, /if\(inTestMode\(\)\) stage\.append\(makeSkip\('Pomiń wpisywanie'/);
+  assert.match(app, /makeSkip\('Pomiń przepisywanie zdania'/);
 
   // Wejscie tylko z panelu i tylko dla admina.
   assert.match(app, /function enterTestMode\(\)\{\s*if\(!currentUser\|\|currentUser\.role!=='admin'\)return;/);
@@ -123,6 +127,28 @@ test('dobór głosu odrzuca głosy męskie i premiuje kobiece', () => {
   // Głos męski musi mieć wynik ujemny, żeby nigdy nie wygrał przez sam akcent.
   assert.ok(score({name: 'Daniel', lang: 'en-GB'}) < 0);
   assert.ok(score({name: 'Google UK English Female', lang: 'en-GB'}) > 0);
+  assert.equal(
+    score({name: 'English Voice', lang: 'en-GB'}),
+    score({name: 'English Voice', lang: 'en-US'}),
+    'aplikacja nie może narzucać brytyjskiego ani amerykańskiego dialektu'
+  );
+});
+
+test('lektor mówi w naturalnym tempie i z neutralną wysokością', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const utterance = app.slice(app.indexOf('function makeUtterance('), app.indexOf('function speakSequence('));
+  assert.match(utterance,/utterance\.rate=1;/);
+  assert.match(utterance,/utterance\.pitch=1;/);
+  assert.doesNotMatch(utterance,/rate=\.[0-9]+|pitch=1\.[0-9]+/);
+});
+
+test('zdania i słowa są czytane bez sztucznego opóźnienia', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  assert.match(app,/function say\(text\)\{ speakSequence\(\[text\]\); \}/);
+  const sentence = app.slice(app.indexOf('function speakSentence('), app.indexOf('function normalizeSpeech('));
+  assert.match(sentence,/speakSequence\(\[String\(text\|\|''\)\.trim\(\)\],onDone\)/);
+  assert.doesNotMatch(sentence,/split|setTimeout|PAUSE|pauseMs/);
+  assert.doesNotMatch(sentence,/\.rate\s*=|\.pitch\s*=/);
 });
 
 test('trafiona para na egzaminie nie wywołuje pochwały', () => {
@@ -147,7 +173,7 @@ test('egzamin otwiera się dopiero po 20 zebranych słowach, także w trybie tes
   assert.equal(occurrences.length, 2);
   occurrences.forEach(line => assert.doesNotMatch(line, /inTestMode/));
   assert.match(app, /if\(count\s*===\s*20\s*&&\s*!passed\)\{/);
-  assert.match(app, /if\(count\s*===\s*20\s*&&\s*!sectionPassed\(currentSectionIndex\)\)\{/);
+  assert.match(app, /if\(!sentenceSession\s*&&\s*count\s*===\s*20\s*&&\s*!sectionPassed\(currentSectionIndex\)\)\{/);
 
   // Tryb testowy skraca droge DO bramki, uzupelniajac sekcje.
   assert.match(app, /if\(inTestMode\(\) && count<20\)\{/);

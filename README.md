@@ -1,6 +1,6 @@
-# Swift-bird — wersja 11.0
+# Swift-bird — wersja 11.12
 
-Szkolna aplikacja internetowa do nauki angielskich słów. Uczniowie logują się
+Szkolna aplikacja internetowa do nauki angielskich słów i budowania zdań. Uczniowie logują się
 bez adresu e-mail: imieniem, pierwszą literą nazwiska i indywidualnym
 4-cyfrowym PIN-em. W fazie testowej mogą sami zakładać konta. Postępy są przechowywane w PostgreSQL i działają na różnych
 urządzeniach po zalogowaniu na to samo konto.
@@ -8,6 +8,8 @@ urządzeniach po zalogowaniu na to samo konto.
 ## Co zawiera aplikacja
 
 - 500 unikalnych słów podzielonych na 25 sekcji po 20 słów;
+- **Kolekcja słów** jest osobnym modułem na stronie głównej; dopiero po jego
+  otwarciu pojawia się pełna lista 25 sekcji;
 - pierwsza sekcja jest otwarta, kolejne są zablokowane;
 - nowe słowo wymaga jednej poprawnej próby wymowy, a następnie ręcznego
   wpisania poprawnego słowa spośród czterech podpowiedzi;
@@ -17,7 +19,39 @@ urządzeniach po zalogowaniu na to samo konto.
 - egzamin ma dwie kolumny, piktogramy i słowa, a oba elementy można
   odsłuchać; poprawna para odtwarza samo słowo, błędna mówi `Try again`;
 - dopiero zdany egzamin odblokowuje następną sekcję;
+- moduł **Klocki zdań** jest widoczny na stronie głównej i otwiera się już po
+  zebraniu 4 słów;
+- każde ćwiczenie zdaniowe korzysta ze słów treściowych, które uczeń ma już
+  w kolekcji; następne zdania pojawiają się wraz z poznawaniem słownictwa;
+- 70 zdań tworzy 7 kolejnych etapów; następny etap otwiera się po poprawnym
+  ułożeniu 3 różnych zdań w poprzednim;
+- po błędzie w zdaniu poprawne fragmenty pozostają zielone, błędne są czerwone
+  i można przesuwać je strzałkami w lewo lub w prawo albo wymienić;
+- po samodzielnym poprawieniu błędu pojawia się dobrowolne porównanie dźwiękowe:
+  wcześniejsza błędna wersja jest czytana raz, a zaraz po niej zawsze poprawna;
+- po poprawnym ułożeniu uczeń musi samodzielnie przepisać całe zdanie wraz
+  z wielką literą, odstępami i kropką albo znakiem zapytania;
+- dopiero po poprawnym przepisaniu zdanie jest czytane przez naturalnego lektora
+  płynnie, bez sztucznych pauz między słowami, a następnie musi zostać przeczytane przez
+  dziecko i potwierdzone przez rozpoznawanie mowy;
+- po zaliczeniu wymowy dziecko samo wybiera **Posłuchaj jeszcze raz** albo
+  **Następne zdanie** — aplikacja nie zmienia zadania automatycznie;
+- dobrowolna pomoc gramatyczna działa na każdym poziomie: pokazuje plan
+  zdania, znaczenie części mowy, przykłady i checklistę samokontroli;
+  wszystkie elementy angielskie są odseparowane od polskiego opisu i pokazane
+  jako takie same klocki jak w zadaniu; każdy angielski klocek można nacisnąć,
+  aby usłyszeć jego naturalną wymowę;
+- ekran Wyprawy Jerzyka wyjaśnia zasady trasy i piórek oraz pokazuje
+  prawdziwą, statyczną mapę OpenStreetMap z 25 przystankami umieszczonymi
+  według ich współrzędnych; drugi przystanek to Warszawa, po najechaniu
+  na punkt pojawia się nazwa miejsca, a dotknięcie zablokowanego punktu
+  podaje liczbę brakujących słów i egzaminów;
+- wyprawa i historyjki o jerzyku mają wersję polską i angielską, a wersję
+  angielską można odtworzyć lektorem;
 - panel administratora tworzy konta, pokazuje postępy i generuje nowy PIN;
+- siedem odznak jest stale widocznych na stronie głównej wraz z warunkami;
+  zdobyta odznaka otwiera dwujęzyczną opowieść z angielskim lektorem,
+  a wcześniejsze osiągnięcia są rozpoznawane po ponownym zalogowaniu;
 - panel ma tryb testowy: przejście całej ścieżki ucznia z pominięciem
   mikrofonu, wpisywania i rund egzaminu, przy wszystkich sekcjach otwartych;
 - uczeń może też sam założyć konto i wymyślić własny PIN, o ile zmienna
@@ -27,6 +61,11 @@ PIN jest pokazywany tylko po utworzeniu konta albo po resecie. W bazie znajduje
 się wyłącznie jego solony skrót kryptograficzny, dlatego administrator powinien
 od razu skopiować, zapisać lub wydrukować dane dla ucznia. Reset unieważnia
 poprzedni PIN i wylogowuje aktywne sesje tego ucznia.
+
+Rzeczywisty podkład mapowy jest pobierany wyłącznie dla obszaru oglądanego przez
+ucznia i wymaga internetu. Pozostałe zapisane elementy aplikacji nadal mogą
+działać z pamięci PWA. Na mapie stale widoczna jest wymagana atrybucja autorów
+OpenStreetMap.
 
 ## Wymagane zmienne
 
@@ -53,8 +92,14 @@ Serwer sam tworzy wymagane tabele przy pierwszym uruchomieniu.
 railway up ./swift-bird --path-as-root -s swift-bird
 ```
 
-Jeżeli rozpakowany katalog na Macu nazywa się `swift-bird-v10.1`, użyj jego pełnej
-ścieżki zamiast `./swift-bird`. Istniejąca domena Railway pozostaje bez zmian.
+Jeżeli rozpakowany katalog na Macu nazywa się `swift-bird-v11.12`, użyj jego pełnej
+ścieżki zamiast `./swift-bird`:
+
+```bash
+railway up "/Users/iwwdm/Downloads/swift-bird-v11.12" --path-as-root -s swift-bird
+```
+
+Istniejąca domena Railway pozostaje bez zmian.
 
 Po wdrożeniu otwórz `/`, wybierz **Panel administratora**, zaloguj się hasłem z
 `ADMIN_PASSWORD`, utwórz pierwszego ucznia i zapisz wygenerowany PIN.
@@ -69,7 +114,7 @@ językowego albo przeglądu przez nauczyciela.
 | Moduł | Poziom | Plik z treścią | Na czym polega |
 |---|---|---|---|
 | M1 Kolekcja słów | zapamiętanie | `words.js` | 500 słów, wymowa, pisownia, powtórki, egzamin par |
-| M2 Klocki zdań | zrozumienie | `patterns.js` | 7 wzorców, 70 zdań; cała gramatyka klasy 4 bez reguł na ekranie |
+| M2 Klocki zdań | zrozumienie, pisanie i mówienie | `patterns.js` | 7 wzorców, 70 zdań; układanie, obowiązkowe przepisywanie, dobrowolna pomoc gramatyczna i obowiązkowe czytanie na głos |
 | M3 Historyjki | zrozumienie | `stories.js` | 8 tekstów; pytanie o główną myśl i o szczegół |
 | M4 Sytuacje | zastosowanie | `dialogues.js` | 8 dialogów, 24 tury; odpowiedź głosem, pełnym zdaniem |
 | M5 Detektyw | analiza | `errors.js` | 20 błędów z uzasadnieniem, 6 porównań, 6 układanek |
@@ -77,11 +122,15 @@ językowego albo przeglądu przez nauczyciela.
 Zasady, na których to stoi, opisuje osobny dokument metodologiczny.
 Trzy najważniejsze konsekwencje w kodzie:
 
-- **Chunki przed regułami.** M2 nie pokazuje żadnej reguły gramatycznej.
-  Dziecko widzi zdanie wzorcowe i układa kolejne. Nazwy czasów pojawiają się
-  dopiero w M5, gdy trzeba ich użyć do uzasadnienia.
-- **Informacja zwrotna, która nie wyręcza.** Po błędzie najpierw sygnał, potem
-  podpowiedź kierunkowa, dopiero po kilku próbach poprawna odpowiedź.
+- **Próba przed podpowiedzią.** Dziecko widzi zdanie wzorcowe i najpierw
+  próbuje samodzielnie. Na każdym poziomie może rozwinąć pomoc z planem
+  zdania, częściami mowy i przykładami; po dwóch błędach pomoc otwiera się
+  automatycznie.
+- **Informacja zwrotna, która nie wyręcza.** Po błędzie ułożenie pozostaje na
+  ekranie: prawidłowy podciąg jest zielony, a czerwone klocki dziecko przesuwa
+  lub wymienia. Po kolejnej próbie dostaje podpowiedź o początku zdania. Dopiero
+  po korekcie może włączyć porównanie błędnego brzmienia z prawidłowym; błędna
+  wersja nigdy nie jest odtwarzana automatycznie ani jako ostatnia.
 - **Bank błędów zasilany własnymi pomyłkami.** Każdy błąd w M2 i M4 trafia do
   rejestru (`state.mistakes`, ostatnie 60) i wraca do dziecka jako zadanie
   w M5. Dlatego rejestracja błędów powstała razem z M2, a nie dopiero z M5.
@@ -102,15 +151,18 @@ Między etapami jest ekran przerwy z kolejnym przystankiem wyprawy. Obok pełnej
 sesji dostępny jest przycisk **Mam tylko chwilę**, czyli osiem minut.
 Każdy ukończony etap zapisuje się osobno, więc przerwanie niczego nie kasuje.
 
-Moduły odblokowują się stopniowo: klocki zdań po 12 słowach, historyjki po 25
+Moduły odblokowują się stopniowo: klocki zdań po 4 słowach, historyjki po 25
 słowach i 5 poprawnych zdaniach, dialogi po 40 słowach i 12 zdaniach,
-detektyw po 20 zdaniach albo 6 zarejestrowanych błędach.
+detektyw po 20 zdaniach albo 6 zarejestrowanych błędach. Klocki zdań mają
+własny ekran dostępny ze strony głównej; nadal pojawiają się też w sesjach
+mieszanych, dzięki czemu gramatyka przeplata się ze słownictwem.
 
 ## Nagrody
 
 Rama fabularna: **wyprawa jerzyka z Jerzykowa na Tasmanię**, 25 przystanków,
 po jednym na sekcję. Zdany egzamin przenosi ptaka dalej i odsłania fakt
-o miejscu. Sama wyprawa jest wymyślona, ale każdy fakt jest prawdziwy;
+po polsku oraz po angielsku z angielskim lektorem. Sama wyprawa jest
+wymyślona, ale każdy fakt jest prawdziwy;
 przystanek 13 mówi wprost, że jerzyk z polskich dachów leci do Afryki,
 a do Australii dolatuje igłosternik białogardły.
 
@@ -133,8 +185,23 @@ Aplikacja sama wybiera kobiecy głos angielski z tych, które ma system.
 Interfejs przeglądarki nie udostępnia informacji o płci głosu, więc jedyną
 drogą jest rozpoznanie po nazwie. Punktacja premiuje znane głosy kobiece
 (Google UK English Female, Samantha, Hazel, Karen, Sonia), odrzuca męskie
-i lekko preferuje akcent brytyjski. Dopasowanie działa na całych słowach,
-bo inaczej fragment `male` trafiałby w nazwę `Female`.
+i premiuje oznaczenia `natural`, `neural`, `premium` oraz `enhanced`.
+Wariant brytyjski i amerykański mają tę samą wagę — aplikacja nie narzuca
+dialektu. Dopasowanie nazw działa na całych słowach, bo inaczej fragment
+`male` trafiałby w nazwę `Female`.
+
+Lektor zawsze działa z fabrycznym tempem `1.0` i neutralną wysokością `1.0`.
+Aplikacja nie spowalnia, nie przyspiesza ani nie podwyższa głosu. Całe zdanie
+jest przekazywane lektorowi jako jedna płynna wypowiedź, bez sztucznego
+opóźnienia między słowami. Pojedyncze słówka również nie są dzielone. Rozpoznawanie mowy
+używa tego samego wariantu języka co wybrany głos, jeśli przeglądarka go
+udostępnia.
+
+Po ułożeniu zdania dziecko słucha wzoru, czyta całe zdanie do mikrofonu i musi
+uzyskać zgodność wszystkich słów niosących znaczenie. Aplikacja uwzględnia
+typowe równoważne zapisy rozpoznawania, np. `I’m` / `I am` i `four` / `for`,
+oraz pominięty przez mikrofon cichy rodzajnik. Nie stosuje luźnego podobieństwa,
+które mogłoby zaliczyć inne zdanie.
 
 Wybrany głos widać w panelu administratora, w karcie **Diagnostyka**, razem
 z przyciskiem **Posłuchaj głosu**. Jeśli panel pokazuje, że kobiecego głosu
@@ -145,8 +212,8 @@ Google, English (United Kingdom).
 ## Tryb testowy
 
 Panel administratora, karta **Diagnostyka**, przycisk **Wejdź w tryb testowy**.
-Otwiera ścieżkę ucznia z przyciskami pomijania: wymowy, wpisywania i rundy
-egzaminu. Dodatkowo, dopóki sekcja nie ma 20 słów, dostępny jest przycisk
+Otwiera ścieżkę ucznia z przyciskami pomijania: wymowy słowa, czytania zdania,
+wpisywania i rundy egzaminu. Dodatkowo, dopóki sekcja nie ma 20 słów, dostępny jest przycisk
 **Uzupełnij sekcję do 20 słów**. Wszystkie 25 sekcji jest odblokowanych.
 
 Tryb testowy nie omija bramki egzaminu. Egzamin zawsze wymaga 20 zebranych
@@ -193,9 +260,10 @@ npm test
 ## Ważne ograniczenia
 
 - Sprawdzanie wymowy korzysta z mechanizmu rozpoznawania mowy przeglądarki.
-  W Chrome wymaga HTTPS, internetu i zgody na mikrofon. Wymagana jest dokładna
-  zgodność rozpoznanego słowa ze wzorcem, sprawdzana na pięciu wariantach
-  rozpoznania. Nie jest to profesjonalna analiza fonetyczna.
+  W Chrome wymaga HTTPS, internetu i zgody na mikrofon. Sprawdzanych jest do
+  dziesięciu wariantów rozpoznania. Bezpieczne homofony są traktowane jako ta
+  sama wymowa, np. `bee`, `B` i `be`, ponieważ mikrofon nie może ich fonetycznie
+  rozróżnić. Nie jest to profesjonalna analiza fonetyczna.
 - Aplikacja nigdy nie pokazuje dziecku surowej transkrypcji, która nie jest
   szukanym słowem. Silnik rozpoznawania potrafi bowiem zwrócić wulgaryzm przy
   dziecięcej wymowie niewinnego słowa, na przykład `horse`. Dodatkowo działa

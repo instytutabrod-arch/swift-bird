@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#12294F">
-  <meta name="description" content="Swift-bird – szkolna aplikacja do nauki angielskich słów.">
+  <meta name="description" content="Swift-bird – szkolna aplikacja do nauki angielskich słów i budowania zdań.">
   <title>Swift-bird</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon-192.png">
@@ -43,16 +43,16 @@
       </div>
       <h1>Witaj!</h1>
       <p class="lead">Wpisz swoje dane i rozpocznij naukę.</p>
-      <form id="studentLogin" class="form-stack">
+      <form id="studentLogin" class="form-stack" novalidate>
         <label>Imię<input id="loginFirstName" name="firstName" autocomplete="given-name" maxlength="40" required></label>
         <label>Pierwsza litera nazwiska<input id="loginLastInitial" name="lastInitial" autocomplete="off" maxlength="1" required></label>
-        <label>PIN<input id="loginPin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" minlength="4" maxlength="4" pattern="[0-9]{4}" required></label>
+        <label>PIN<input id="loginPin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="4" aria-describedby="loginPinHint loginError" required><small id="loginPinHint" class="field-hint">PIN składa się z 4 cyfr.</small></label>
         <p id="loginError" class="form-error" role="alert"></p>
         <button class="primary" type="submit">Zaloguj się</button>
       </form>
       <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
       <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
-      <p class="version-label">Wersja 11.1</p>
+      <p class="version-label">Wersja 11.13</p>
     </div>
   </section>
 
@@ -65,11 +65,11 @@
       </div>
       <h1>Nowe konto</h1>
       <p class="lead">Wymyśl swój PIN i zapamiętaj go. Będzie potrzebny przy każdym logowaniu.</p>
-      <form id="studentRegister" class="form-stack">
+      <form id="studentRegister" class="form-stack" novalidate>
         <label>Imię<input id="regFirstName" name="firstName" autocomplete="given-name" maxlength="40" required></label>
         <label>Pierwsza litera nazwiska<input id="regLastInitial" name="lastInitial" autocomplete="off" maxlength="1" required></label>
-        <label>Wymyśl PIN, 4 cyfry<input id="regPin" name="pin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="4" pattern="[0-9]{4}" required></label>
-        <label>Powtórz PIN<input id="regPinRepeat" name="pinRepeat" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="4" pattern="[0-9]{4}" required></label>
+        <label>Wymyśl PIN, 4 cyfry<input id="regPin" name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="4" required></label>
+        <label>Powtórz PIN<input id="regPinRepeat" name="pinRepeat" type="password" inputmode="numeric" autocomplete="new-password" maxlength="4" required></label>
         <p id="registerError" class="form-error" role="alert"></p>
         <button class="primary" type="submit">Załóż konto i zacznij</button>
       </form>
@@ -90,7 +90,7 @@
         <p id="adminLoginError" class="form-error" role="alert"></p>
         <button class="primary" type="submit">Zaloguj się</button>
       </form>
-      <p class="version-label">Wersja 10.1</p>
+      <p class="version-label">Wersja 11.13</p>
     </div>
   </section>
 
@@ -113,13 +113,75 @@
         <div><b id="passedN">0</b><span>zdanych egzaminów</span></div>
         <div><b id="openN">1</b><span>otwartych sekcji</span></div>
         <div><b id="featherN">0</b><span>piórka</span></div>
+        <div><b id="badgeN">0</b><span>z 7 odznak</span></div>
       </section>
       <section class="home-actions">
-        <button id="openMap" class="secondary wide" type="button">Wyprawa Jerzyka</button>
+        <button id="openMap" class="secondary wide" type="button">🗺️ Mapa wyprawy Jerzyka</button>
+        <p class="journey-home-copy">Każdy zdany egzamin przesuwa Jerzyka do kolejnego miejsca. Piórka zdobywasz za trudne, dobrze wykonane zadania.</p>
         <p id="challengeLine" class="done-challenge"></p>
       </section>
-      <div class="section-heading"><div><p class="eyebrow">25 etapów</p><h2>Sekcje słówek</h2></div><p>Każda sekcja zawiera 20 słów. Zbierz je i zdaj egzamin, aby otworzyć kolejną.</p></div>
+      <section class="learning-modules" aria-label="Moduły nauki">
+        <section id="vocabularyLaunch" class="module-launch vocabulary-launch" aria-labelledby="vocabularyLaunchTitle">
+          <div class="module-launch-icon" aria-hidden="true">📚</div>
+          <div class="module-launch-copy">
+            <p class="eyebrow">Moduł 1</p>
+            <h2 id="vocabularyLaunchTitle">Kolekcja słów</h2>
+            <p id="vocabularyLaunchText">0 z 500 słów · 1 z 25 sekcji otwarta.</p>
+            <div class="module-progress" aria-hidden="true"><i id="vocabularyLaunchFill"></i></div>
+          </div>
+          <button id="openVocabulary" class="primary" type="button">Ucz się słówek</button>
+        </section>
+        <section id="sentenceLaunch" class="module-launch sentence-launch" aria-labelledby="sentenceLaunchTitle">
+          <div class="module-launch-icon" aria-hidden="true">🧱</div>
+          <div class="module-launch-copy">
+            <p class="eyebrow">Moduł 2</p>
+            <h2 id="sentenceLaunchTitle">Klocki zdań</h2>
+            <p id="sentenceLaunchText">Zbierz pierwsze 4 słowa, aby zacząć układać zdania.</p>
+            <div class="module-progress" aria-hidden="true"><i id="sentenceLaunchFill"></i></div>
+          </div>
+          <button id="openSentences" class="primary" type="button">Ćwicz zdania</button>
+        </section>
+      </section>
+      <section class="home-badges" aria-labelledby="homeBadgesTitle">
+        <div class="home-badges-head">
+          <div><p class="eyebrow">Twoje osiągnięcia</p><h2 id="homeBadgesTitle">Odznaki Jerzyka</h2></div>
+          <strong id="homeBadgeCount">0 z 7 zdobytych</strong>
+        </div>
+        <p class="home-badges-copy">Dotknij odznaki, aby sprawdzić warunek. Po jej zdobyciu otworzysz polską i angielską opowieść oraz angielskiego lektora.</p>
+        <div id="homeBadgeList" class="badge-list home-badge-list"></div>
+      </section>
+    </main>
+  </section>
+
+  <section id="s-vocabulary" class="screen app-screen">
+    <header class="simple-header"><button id="vocabularyBack" class="back-button" type="button">← Strona główna</button><span>Kolekcja słów</span></header>
+    <main class="content vocabulary-content">
+      <section class="sentence-hero vocabulary-hero">
+        <div><p class="eyebrow">Moduł 1 · zapamiętanie</p><h1>Wybierz sekcję słówek</h1><p>Każda sekcja zawiera 20 słów. Zbierz je i zdaj egzamin, aby otworzyć kolejną.</p></div>
+        <div class="sentence-summary" aria-label="Postęp w słówkach">
+          <div><b id="vocabularyCollectedN">0</b><span>z 500 słów</span></div>
+          <div><b id="vocabularyPassedN">0</b><span>zdanych egzaminów</span></div>
+          <div><b id="vocabularyOpenN">1</b><span>otwartych sekcji</span></div>
+        </div>
+      </section>
+      <div class="section-heading"><div><p class="eyebrow">25 etapów</p><h2>Sekcje słówek</h2></div><p>Dotknij otwartej sekcji, aby uczyć się lub powtarzać słowa.</p></div>
       <div id="sectionsGrid" class="sections-grid"></div>
+    </main>
+  </section>
+
+  <section id="s-sentences" class="screen app-screen">
+    <header class="simple-header"><button id="sentencesBack" class="back-button" type="button">← Strona główna</button><span>Klocki zdań</span></header>
+    <main class="content sentence-content">
+      <section class="sentence-hero">
+        <div><p class="eyebrow">Moduł 2 · budowanie, pisanie i mówienie</p><h1>Buduj zdania krok po kroku</h1><p>Ułóż zdanie, przepisz je dokładnie, posłuchaj naturalnego wzoru i przeczytaj na głos. Dopiero poprawna budowa, pisownia i wymowa zaliczają zadanie.</p></div>
+        <div class="sentence-summary" aria-label="Postęp w zdaniach">
+          <div><b id="sentenceKnownN">0</b><span>z 70 zdań</span></div>
+          <div><b id="sentenceOpenN">1</b><span>otwartych tematów</span></div>
+          <div><b id="sentenceFeatherN">0</b><span>piórka</span></div>
+        </div>
+      </section>
+      <p id="sentenceHubNote" class="sentence-hub-note"></p>
+      <div id="patternGrid" class="pattern-grid"></div>
     </main>
   </section>
 
@@ -145,9 +207,9 @@
       <div class="done-mark">✓</div>
       <h1 id="doneTitle">Dobra robota!</h1>
       <div class="overview done-stats">
-        <div><b id="dNew">0</b><span>nowe słowa</span></div>
-        <div><b id="dOk">0</b><span>trafione</span></div>
-        <div><b id="dSection">0</b><span>z 20 zebranych</span></div>
+        <div><b id="dNew">0</b><span id="dNewLabel">nowe słowa</span></div>
+        <div><b id="dOk">0</b><span id="dOkLabel">trafione</span></div>
+        <div><b id="dSection">0</b><span id="dSectionLabel">z 20 zebranych</span></div>
         <div><b id="dFeathers">0</b><span>piórka</span></div>
       </div>
       <p id="doneChallenge" class="done-challenge"></p>
@@ -170,11 +232,31 @@
   <section id="s-map" class="screen app-screen">
     <header class="simple-header"><button id="mapBack" class="back-button" type="button">← Wróć</button><span>Wyprawa Jerzyka</span></header>
     <main class="content">
+      <section class="journey-explainer" aria-label="Jak działa wyprawa">
+        <article>
+          <span class="journey-explainer-icon" aria-hidden="true">🗺️</span>
+          <div><h1>Co to jest Wyprawa Jerzyka?</h1><p>To wymyślona trasa od Jerzykowa do Tasmanii. Każda z 25 sekcji słówek jest jednym etapem. Zbierz 20 słów i zdaj egzamin, a Jerzyk poleci do następnego przystanku.</p></div>
+        </article>
+        <article>
+          <span class="journey-explainer-icon" aria-hidden="true">🪶</span>
+          <div><h2>Czym są piórka?</h2><p>To nagrody za wymagające osiągnięcia: dobre zadanie za pierwszym razem, poprawienie błędu lub bezbłędny egzamin. Nie są oceną ani rankingiem i nie dostaje się ich za sam czas w aplikacji.</p></div>
+        </article>
+      </section>
       <p class="lead" id="mapLead"></p>
+      <section class="journey-map-card" aria-labelledby="journeyMapTitle">
+        <div class="journey-map-head">
+          <div><p class="eyebrow">Prawdziwa mapa geograficzna</p><h2 id="journeyMapTitle">Szlak Jerzyka</h2></div>
+          <div class="journey-map-legend" aria-label="Legenda"><span><i class="reached"></i>odwiedzone</span><span><i class="locked"></i>zablokowane</span></div>
+        </div>
+        <div id="journeyRouteMap" class="journey-route-map" aria-label="Statyczna mapa 25 przystanków wyprawy Jerzyka"></div>
+        <p class="map-data-note">Nieruchomy podkład OpenStreetMap pokazuje rzeczywiste kraje i miejscowości. Linia łączy przystanki wymyślonej wyprawy.</p>
+        <p id="mapHint" class="map-hint" aria-live="polite">Dotknij punktu, aby zobaczyć nazwę miejsca i ciekawostkę. Zablokowane punkty pokażą, co trzeba zrobić.</p>
+      </section>
+      <h2 class="map-heading first">Przystanki i opowieści</h2>
       <ol id="mapList" class="map-list"></ol>
       <h2 class="map-heading">Odznaki</h2>
       <div id="badgeList" class="badge-list"></div>
-      <p class="fine-print">Wyprawa jest wymyślona, ale każdy fakt jest prawdziwy.</p>
+      <p class="fine-print">Wyprawa jest wymyślona, ale każdy fakt jest prawdziwy. Każdy przystanek ma opis po polsku i po angielsku oraz angielskiego lektora.</p>
     </main>
   </section>
 
@@ -224,7 +306,7 @@
         <div class="admin-list-head"><div><p class="eyebrow">Uczniowie</p><h2>Konta i postępy</h2></div><button id="refreshStudents" class="secondary" type="button">Odśwież</button></div>
         <p id="adminError" class="form-error" role="alert"></p>
         <div class="table-wrap">
-          <table><thead><tr><th>Uczeń</th><th>Słowa</th><th>Sekcja</th><th>Egzaminy</th><th>Ostatnia aktywność</th><th></th></tr></thead><tbody id="studentsBody"></tbody></table>
+          <table><thead><tr><th>Uczeń</th><th>Słowa</th><th>Zdania</th><th>Sekcja</th><th>Egzaminy</th><th>Ostatnia aktywność</th><th></th></tr></thead><tbody id="studentsBody"></tbody></table>
         </div>
         <div id="studentsEmpty" class="empty-state" hidden>Nie ma jeszcze kont uczniów.</div>
       </section>

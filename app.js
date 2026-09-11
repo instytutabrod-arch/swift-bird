@@ -1,10 +1,12 @@
 'use strict';
 
-const APP_VERSION = '11.1';
+const APP_VERSION = '11.13';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
 const MAX_SESSION_ITEMS = 20;
+const SENTENCE_UNLOCK_WORDS = 4;
+const SENTENCE_UNLOCK_SUCCESSES = 3;
 
 /* Sesja ma cztery etapy i twardy limit 25 minut. Dwadzieścia pięć minut
    jednego typu zadania to dla dziesięciolatki za dużo: po kilkunastu
@@ -28,35 +30,97 @@ const COMPARE_ITEMS = (window.COMPARISONS || []);
 const ORDER_ITEMS = (window.ORDERINGS || []);
 const JOURNEY_STOPS = (window.JOURNEY || []);
 
+/* Pomoc jest dobrowolna i dostepna na kazdym poziomie trudnosci. Dziecko
+   najpierw probuje odkryc wzorzec, ale nigdy nie zostaje bez wyjasnienia. */
+const GRAMMAR_TERMS=Object.freeze({
+  noun:{label:'Rzeczownik',english:'noun',definition:'Nazywa osobę, zwierzę, rzecz lub miejsce.',examples:['sister','cat','book','school']},
+  pronoun:{label:'Zaimek',english:'pronoun',definition:'Zastępuje nazwę osoby albo rzeczy.',examples:['I','you','he','she','it','we','they']},
+  verb:{label:'Czasownik',english:'verb',definition:'Mówi, co ktoś robi albo w jakim jest stanie.',examples:['run','read','is','have']},
+  adjective:{label:'Przymiotnik',english:'adjective',definition:'Opisuje osobę, zwierzę albo rzecz.',examples:['happy','tall','blue','small']},
+  preposition:{label:'Przyimek',english:'preposition',definition:'Pokazuje miejsce albo kierunek.',examples:['in','on','under','behind','to']},
+  question:{label:'Słowo pytające',english:'question word',definition:'Pokazuje, jakiej informacji szukasz.',examples:['who','what','where','when','why','how']}
+});
+const GRAMMAR_GUIDES=Object.freeze({
+  'to-be-positive':{
+    formula:[{pl:'Osoba lub rzecz'},{en:['am','is','are']},{pl:'informacja albo opis'}],
+    examples:[['She','is','tired','.'],['This','is','a','cat','.']],
+    tip:[{en:['I']},{pl:'łączymy z'},{en:['am']},{pl:'·'},{en:['he','she','it']},{pl:'z'},{en:['is']},{pl:'·'},{en:['you','we','they']},{pl:'z'},{en:['are']}],
+    terms:['noun','pronoun','verb','adjective']
+  },
+  'to-be-question':{
+    formula:[{pl:'Pytanie:'},{en:['Am','Is','Are']},{pl:'osoba lub rzecz'},{pl:'opis'},{en:['?']},{pl:'Przeczenie: osoba lub rzecz'},{en:['am','is','are','not']},{pl:'reszta zdania'}],
+    examples:[['Is','this','a','cat','?'],['She','is','not','sad','.']],
+    tip:[{pl:'W pytaniu'},{en:['am','is','are']},{pl:'stawiamy przed osobą lub rzeczą. W przeczeniu po czasowniku stoi'},{en:['not']}],
+    terms:['noun','pronoun','verb','adjective']
+  },
+  'have-got':{
+    formula:[{pl:'Osoba'},{en:['have','has','got']},{pl:'to, co ma'}],
+    examples:[['I','have','got','a','cat','.'],['She','has','got','a','dog','.']],
+    tip:[{en:['he','she','it']},{pl:'wybierają'},{en:['has']},{pl:'·'},{en:['I','you','we','they']},{pl:'wybierają'},{en:['have']}],
+    terms:['noun','pronoun','verb']
+  },
+  'present-simple':{
+    formula:[{pl:'Osoba lub rzecz'},{pl:'czynność wykonywana zwykle'},{pl:'szczegóły'}],
+    examples:[['We','play','football','on','Monday','.'],['She','reads','a','book','.']],
+    tip:[{pl:'Przy'},{en:['he','she','it']},{pl:'czasownik zwykle dostaje końcówkę'},{en:['-s']},{pl:'Sygnałami mogą być'},{en:['every day','always']}],
+    terms:['noun','pronoun','verb','preposition']
+  },
+  'present-continuous':{
+    formula:[{pl:'Osoba lub rzecz'},{en:['am','is','are']},{pl:'czynność z końcówką'},{en:['-ing']}],
+    examples:[['The','cat','is','sleeping','.'],['We','are','playing','.']],
+    tip:[{pl:'Ten wzór mówi o tym, co dzieje się właśnie teraz. Sygnałem może być'},{en:['now']}],
+    terms:['noun','pronoun','verb']
+  },
+  prepositions:{
+    formula:[{pl:'Osoba lub rzecz'},{en:['is','are']},{pl:'przyimek miejsca'},{pl:'miejsce'}],
+    examples:[['The','cat','is','under','the','table','.']],
+    tip:[{pl:'Najpierw znajdź rzecz, potem jej miejsce:'},{en:['in','on','under','behind','between']}],
+    terms:['noun','verb','preposition']
+  },
+  'wh-questions':{
+    formula:[{pl:'Słowo pytające'},{pl:'czasownik pomocniczy'},{pl:'osoba lub rzecz'},{pl:'reszta'},{en:['?']}],
+    examples:[['Where','is','the','cat','?'],['When','do','you','play','?']],
+    tip:[{pl:'Najpierw ustal, o co pytasz. Potem wybierz właściwy klocek:'},{en:['who','what','where','when','why','how']}],
+    terms:['question','noun','pronoun','verb']
+  }
+});
+
 const BADGES = [
   { id:'first-hundred', name:'Pierwsza setka', icon:'💯',
     desc:'100 słów w kolekcji',
     reward:'Jerzyk dostaje zapas na drogę.',
-    story:'Jerzyk łapie owady w locie, nigdy na ziemi. Zbiera je w gardle w małą kulkę, sklejoną własną śliną, i dopiero taką porcję zanosi młodym. W jednej kulce potrafi być kilkaset owadów. Twoje sto słów to dokładnie taka kulka: same w sobie drobne, razem wystarczają na długi lot.' },
+    story:'Jerzyk łapie owady w locie, nigdy na ziemi. Zbiera je w gardle w małą kulkę, sklejoną własną śliną, i dopiero taką porcję zanosi młodym. W jednej kulce potrafi być kilkaset owadów. Twoje sto słów to dokładnie taka kulka: same w sobie drobne, razem wystarczają na długi lot.',
+    storyEn:'A swift catches insects while flying, never on the ground. It gathers them in its throat and makes a small ball held together with saliva. Only then does it carry the meal to its chicks. One ball can contain hundreds of insects. Your one hundred words are just like that ball: tiny on their own, but strong enough together for a long flight.' },
   { id:'builder', name:'Budowniczy zdań', icon:'🧱',
     desc:'50 zdań ułożonych bez błędu',
     reward:'Gniazdo w gnieździe rośnie.',
-    story:'Jerzyk buduje gniazdo z tego, co złapie w powietrzu: piórek, źdźbeł, kawałków liści porwanych przez wiatr. Skleja je własną śliną, która zasycha na twardo. Nic nie zbiera z ziemi, wszystko chwyta w locie. Ty też budujesz zdania z kawałków, które już masz.' },
+    story:'Jerzyk buduje gniazdo z tego, co złapie w powietrzu: piórek, źdźbeł, kawałków liści porwanych przez wiatr. Skleja je własną śliną, która zasycha na twardo. Nic nie zbiera z ziemi, wszystko chwyta w locie. Ty też budujesz zdania z kawałków, które już masz.',
+    storyEn:'A swift builds its nest from things caught in the air: feathers, blades of grass and pieces of leaves carried by the wind. It joins them with its own saliva, which dries hard. It collects nothing from the ground and catches everything in flight. You are building sentences from pieces you already have, too.' },
   { id:'flawless', name:'Bez potknięcia', icon:'🎯',
     desc:'egzamin sekcji bez ani jednej pomyłki',
     reward:'Czysty przelot nad przystankiem.',
-    story:'Jerzyk potrafi pić bez lądowania. Zniża lot nad wodą, muska ją dziobem i leci dalej, nie zwalniając. Nie siada, bo z płaskiej ziemi bardzo trudno mu wystartować: ma malutkie nóżki i długie skrzydła. Twój egzamin bez pomyłki wyglądał dokładnie tak: jeden gładki przelot.', manual:true },
+    story:'Jerzyk potrafi pić bez lądowania. Zniża lot nad wodą, muska ją dziobem i leci dalej, nie zwalniając. Nie siada, bo z płaskiej ziemi bardzo trudno mu wystartować: ma malutkie nóżki i długie skrzydła. Twój egzamin bez pomyłki wyglądał dokładnie tak: jeden gładki przelot.',
+    storyEn:'A swift can drink without landing. It flies low over the water, touches the surface with its beak and carries on without slowing down. It avoids the flat ground because taking off is very difficult with tiny feet and long wings. Your perfect exam looked exactly like that: one smooth flight from beginning to end.', manual:true },
   { id:'detective', name:'Detektyw', icon:'🔍',
     desc:'15 zadań detektywa z poprawnym uzasadnieniem',
     reward:'Ostre oko na trasie.',
-    story:'Jerzyk poluje na owady tak drobne, że my ich z ziemi nie widzimy. Naukowcy nazywają tę chmurę unoszącą się wysoko nad nami aeroplanktonem. Ptak dostrzega w niej pojedynczą muszkę i chwyta ją przy prędkości, przy której my nie zdążylibyśmy mrugnąć. Wyłapywanie błędu w zdaniu to ta sama umiejętność: widzieć drobiazg, który innym umyka.' },
+    story:'Jerzyk poluje na owady tak drobne, że my ich z ziemi nie widzimy. Naukowcy nazywają tę chmurę unoszącą się wysoko nad nami aeroplanktonem. Ptak dostrzega w niej pojedynczą muszkę i chwyta ją przy prędkości, przy której my nie zdążylibyśmy mrugnąć. Wyłapywanie błędu w zdaniu to ta sama umiejętność: widzieć drobiazg, który innym umyka.',
+    storyEn:'A swift hunts insects so tiny that we cannot see them from the ground. Scientists call this cloud high above us aeroplankton. The bird spots one small fly inside it and catches it at a speed that is faster than our blink. Finding an error in a sentence uses the same skill: noticing a tiny detail that other people miss.' },
   { id:'speaker', name:'Rozmówca', icon:'🗣️',
     desc:'30 pełnych zdań powiedzianych na głos',
     reward:'Głos nad dachami.',
-    story:'Latem nad polskimi wsiami słychać ostre, przeciągłe piski. To jerzyki krążą stadem nad dachami i wołają do siebie w locie. Ten dźwięk to jeden z niewielu sposobów, w jakie dają o sobie znać, bo widać je rzadko: prawie nie siadają. Ty też właśnie zacząłeś być słyszalny po angielsku.' },
+    story:'Latem nad polskimi wsiami słychać ostre, przeciągłe piski. To jerzyki krążą stadem nad dachami i wołają do siebie w locie. Ten dźwięk to jeden z niewielu sposobów, w jakie dają o sobie znać, bo widać je rzadko: prawie nie siadają. Ty też właśnie zacząłeś być słyszalny po angielsku.',
+    storyEn:'In summer, sharp and drawn-out calls can be heard above Polish villages. Swifts circle in groups over the roofs and call to one another while flying. Their voice is one of the few ways they make themselves known because they are rarely seen sitting down. You have just started to make your own voice heard in English, too.' },
   { id:'golden-word', name:'Złote słowo', icon:'🥇',
     desc:'słowo utrwalone do samego końca',
     reward:'Coś, czego już nie zgubisz.',
-    story:'Młody jerzyk po opuszczeniu gniazda potrafi nie usiąść przez wiele miesięcy. Śpi w locie, wznosząc się wieczorem wysoko i drzemiąc krótkimi chwilami. Nie musi się uczyć tego od nowa każdego dnia, po prostu to umie. Twoje złote słowo jest już takie: siedzi w tobie i nie wymaga wysiłku.' },
+    story:'Młody jerzyk po opuszczeniu gniazda potrafi nie usiąść przez wiele miesięcy. Śpi w locie, wznosząc się wieczorem wysoko i drzemiąc krótkimi chwilami. Nie musi się uczyć tego od nowa każdego dnia, po prostu to umie. Twoje złote słowo jest już takie: siedzi w tobie i nie wymaga wysiłku.',
+    storyEn:'After leaving the nest, a young swift may stay in the air for many months. It sleeps in flight by climbing high in the evening and taking very short naps. It does not have to learn this again every day; it simply knows how. Your golden word is like that now: it stays inside you and no longer needs hard work.' },
   { id:'persistent', name:'Wytrwałość', icon:'📆',
     desc:'7 dni z rzędu',
     reward:'Siódmy dzień lotu.',
-    story:'Jerzyk zwyczajny spędza w powietrzu prawie całe życie. Je, pije, śpi i łączy się w pary w locie. Nazwa jego rodzaju, Apus, znaczy po grecku „bez nóg", bo dawniej sądzono, że ten ptak wcale nie ląduje. Siedem dni z rzędu to twój pierwszy taki nieprzerwany lot.' }
+    story:'Jerzyk zwyczajny spędza w powietrzu prawie całe życie. Je, pije, śpi i łączy się w pary w locie. Nazwa jego rodzaju, Apus, znaczy po grecku „bez nóg", bo dawniej sądzono, że ten ptak wcale nie ląduje. Siedem dni z rzędu to twój pierwszy taki nieprzerwany lot.',
+    storyEn:'A common swift spends almost its entire life in the air. It eats, drinks, sleeps and even finds a partner while flying. Its genus name, Apus, means without feet in Greek because people once believed that the bird never landed at all. Seven days in a row are your first long and unbroken flight.' }
 ];
 const BADGE_TESTS = {
   'first-hundred': state => collectedTotal(state) >= 100,
@@ -309,6 +373,7 @@ const FEMALE_VOICES=[
   'zira','hazel','sonia','aria','jenny','michelle','libby','emma','eva','catherine','linda','heera'
 ];
 const MALE_VOICES=['male','daniel','alex','fred','oliver','tom','rishi','aaron','arthur','george','james','david','mark','guy','ryan','brian','gordon','lee','rocko','junior','ralph','albert','bad news','bahh','bells','boing','bubbles','cellos','jester','organ','superstar','trinoids','whisper','wobble','zarvox'];
+const NATURAL_VOICE_HINTS=['natural','neural','premium','enhanced','online'];
 
 /* Dopasowanie po calych slowach, nie po fragmentach. Bez tego "male"
    trafialoby w "Google UK English Female", a "lee" w "Kathleen". */
@@ -323,13 +388,14 @@ function voiceScore(item){
   if(!female && MALE_VOICES.some(token=>hasWord(name,token))) score-=1000;
   if(female) score+=200;
   if(FEMALE_VOICES.some(token=>name.includes(token))) score+=140;
-  // Brytyjski akcent brzmi dla polskiego ucha wyrazniej w krotkich slowach.
-  if(lang==='en-gb') score+=30;
-  else if(lang==='en-us') score+=24;
+  // Nie narzucamy dialektu: popularne warianty brytyjski i amerykański
+  // dostają dokładnie tę samą wagę. Wygrywa jakość i naturalność głosu.
+  if(lang==='en-gb'||lang==='en-us') score+=24;
   else if(lang.startsWith('en-')) score+=10;
+  if(NATURAL_VOICE_HINTS.some(token=>name.includes(token))) score+=80;
   // Glosy sieciowe sa zwykle lepszej jakosci, ale wymagaja internetu.
   if(item.localService===false) score+=6;
-  if(item.default) score+=3;
+  if(item.default) score+=18;
   return score;
 }
 
@@ -355,8 +421,8 @@ function updateVoiceInfo(){
   if(!voice){ element.textContent='System nie ma głosu angielskiego. Doinstaluj dane głosowe: Ustawienia, Tekst na mowę, silnik Google, English.'; return; }
   const name=(voice.name||'').toLowerCase();
   const looksFemale=hasWord(name,'female')||FEMALE_VOICES.some(token=>name.includes(token));
-  element.textContent='Głos: '+voice.name+' ('+voice.lang+'). '+
-    (looksFemale?'Rozpoznany jako kobiecy.':'Nie udało się rozpoznać kobiecego głosu. Doinstaluj dane głosowe English (United Kingdom) w ustawieniach systemu.');
+  element.textContent='Głos: '+voice.name+' ('+voice.lang+'). Tempo i wysokość: naturalne. '+
+    (looksFemale?'Rozpoznany jako kobiecy.':'Nie udało się rozpoznać kobiecego głosu. Doinstaluj angielskie dane głosowe w ustawieniach systemu.');
 }
 if(hasTTS){
   pickVoice();
@@ -374,7 +440,7 @@ function stopSpeech(){
 
 function makeUtterance(text){
   const utterance=new SpeechSynthesisUtterance(text);
-  utterance.lang=voice?voice.lang:'en-GB'; utterance.rate=.80; utterance.pitch=1.12; utterance.volume=1;
+  utterance.lang=voice?voice.lang:'en-US'; utterance.rate=1; utterance.pitch=1; utterance.volume=1;
   if(voice) utterance.voice=voice;
   return utterance;
 }
@@ -391,7 +457,12 @@ function speakSequence(phrases,onDone){
     const text=list[index++];
     const utterance=makeUtterance(text);
     let finished=false;
-    const finish=()=>{ if(finished)return; finished=true; clearTimeout(fallback); next(); };
+    const finish=()=>{
+      if(finished)return;
+      finished=true;
+      clearTimeout(fallback);
+      next();
+    };
     const fallback=setTimeout(finish,Math.max(2600,text.length*190));
     utterance.onend=finish; utterance.onerror=finish;
     try{ window.speechSynthesis.speak(utterance); }catch(error){ finish(); }
@@ -400,7 +471,27 @@ function speakSequence(phrases,onDone){
 }
 function say(text){ speakSequence([text]); }
 
-function normalizeSpeech(value){ return (value||'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim(); }
+/* Cale zdanie jest jedna naturalna wypowiedzia. Nie rozdzielamy go na
+   slowa, nie dodajemy sztucznego opoznienia i nie zmieniamy tempa glosu. */
+function speakSentence(text,onDone){
+  speakSequence([String(text||'').trim()],onDone);
+}
+
+function normalizeSpeech(value){
+  return String(value||'').toLowerCase()
+    .replace(/[\u2018\u2019]/g,"'")
+    .replace(/\bi'm\b/g,'i am')
+    .replace(/\b(you|we|they)'re\b/g,'$1 are')
+    .replace(/\b(i|you|we|they)'ve\b/g,'$1 have')
+    .replace(/\b(he|she|it)'s got\b/g,'$1 has got')
+    .replace(/\b(he|she|it|this|that|what|who|where|when|why|how)'s\b/g,'$1 is')
+    .replace(/\b(is|are|was|were|have|has|do|does|did|can|could|will|would|should)n't\b/g,'$1 not')
+    .replace(/\bwon't\b/g,'will not')
+    .replace(/\bcan't\b/g,'can not')
+    .replace(/[^a-z0-9 ]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
 /* Wulgaryzmy, ktore silnik rozpoznawania potrafi zwrocic przy dziecinnej wymowie
    niewinnych slow (klasyczny przypadek: horse). Nigdy nie pokazujemy dziecku
    transkrypcji, ktora nie jest szukanym slowem, a ta lista jest druga zapora. */
@@ -408,12 +499,46 @@ const BLOCKED_WORDS=new Set(['whore','hore','hoar','ass','arse','shit','fuck','f
 function containsBlockedWord(value){
   return normalizeSpeech(value).split(' ').some(word=>BLOCKED_WORDS.has(word));
 }
-/* Pewnosc rozpoznania (confidence) jest w Chrome przy krotkich, pojedynczych
-   slowach niemiarodajna: potrafi zwrocic 0.4 dla idealnie wypowiedzianego
-   "duck". Progowanie po niej odrzucalo poprawne odpowiedzi, dlatego liczy sie
-   wylacznie zgodnosc transkrypcji. */
+/* Rozpoznawanie mowy zapisuje homofony według znaczenia, którego nie zna.
+   Dlatego poprawnie wymówione "bee" może wrócić jako "B" albo "be". Poniżej
+   są wyłącznie bezpieczne odpowiedniki o tej samej wymowie — nie stosujemy
+   luźnej odległości tekstowej, która przepuszczałaby inne słowa. */
+const SPEECH_EQUIVALENTS=Object.freeze({
+  b:'bee',be:'bee','letter b':'bee',
+  c:'sea',see:'sea','letter c':'sea',
+  i:'eye','letter i':'eye',
+  t:'tea',tee:'tea','letter t':'tea',
+  son:'sun',pair:'pear',plain:'plane',flour:'flower',blew:'blue',
+  won:'one',to:'two',too:'two',for:'four',write:'right',
+  their:'there','they re':'there',hear:'here',weak:'week',knows:'nose',
+  knew:'new',by:'buy',bye:'buy',knight:'night'
+});
+function speechKey(value){
+  const normalized=normalizeSpeech(value).replace(/^(?:a|an|the)\s+/,'');
+  return SPEECH_EQUIVALENTS[normalized]||normalized;
+}
+/* Pewność rozpoznania (confidence) jest w Chrome przy krótkich słowach
+   niemiarodajna. Liczy się zgodna wymowa zapisana w jednej z równoważnych form. */
 function pronunciationMatches(heard,target){
-  return normalizeSpeech(heard)===normalizeSpeech(target);
+  const heardKey=speechKey(heard);const targetKey=speechKey(target);
+  return Boolean(heardKey)&&heardKey===targetKey;
+}
+
+/* Przy dluzszej wypowiedzi Chrome czasem zapisuje poprawne brzmienie jako
+   homofon albo gubi cichy rodzajnik. Najpierw normalizujemy bezpieczne
+   odpowiedniki, a potem wymagamy tej samej kolejnosci wszystkich wyrazow
+   niosacych znaczenie. Nie stosujemy przyblizonej odleglosci tekstowej. */
+const OPTIONAL_SENTENCE_WORDS=new Set(['a','an','the']);
+function sentenceSpeechTokens(value){
+  return normalizeSpeech(value).split(' ')
+    .map(word=>SPEECH_EQUIVALENTS[word]||word)
+    .filter(word=>word&&!OPTIONAL_SENTENCE_WORDS.has(word));
+}
+function sentencePronunciationMatches(heard,target){
+  const heardTokens=sentenceSpeechTokens(heard);
+  const targetTokens=sentenceSpeechTokens(target);
+  return Boolean(heardTokens.length)&&heardTokens.length===targetTokens.length&&
+    heardTokens.every((word,index)=>word===targetTokens[index]);
 }
 const SPEECH_ERRORS={
   'not-allowed':'Brak dostępu do mikrofonu. Zezwól na mikrofon w ustawieniach strony.',
@@ -423,7 +548,7 @@ const SPEECH_ERRORS={
   'network':'Rozpoznawanie mowy wymaga internetu.',
   'aborted':'Nagrywanie zostało przerwane.'
 };
-function listen(target,callback){
+function listen(target,callback,matcher=pronunciationMatches){
   stopSpeech();
   let settled=false;
   const finish=result=>{
@@ -434,10 +559,12 @@ function listen(target,callback){
   };
   try{
     recognition=new SpeechRecognitionClass();
-    recognition.lang='en-US'; recognition.interimResults=false; recognition.maxAlternatives=5; recognition.continuous=false;
+    const voiceLang=voice&&String(voice.lang||'').replace('_','-');
+    recognition.lang=/^en(?:-|$)/i.test(voiceLang)?voiceLang:'en-US';
+    recognition.interimResults=false; recognition.maxAlternatives=10; recognition.continuous=false;
     recognition.onresult=event=>{
-      const alternatives=Array.from(event.results[0]||[]).map(item=>item&&item.transcript||'').filter(Boolean);
-      const ok=alternatives.some(text=>pronunciationMatches(text,target));
+      const alternatives=Array.from(event.results||[]).flatMap(result=>Array.from(result||[])).map(item=>item&&item.transcript||'').filter(Boolean);
+      const ok=alternatives.some(text=>matcher(text,target));
       const raw=alternatives.find(text=>!containsBlockedWord(text))||'';
       // Przy trafieniu pokazujemy szukane slowo, nie surowa transkrypcje.
       // Przy pudle nie pokazujemy nic: dziecko nie ma powodu widziec,
@@ -466,46 +593,141 @@ let currentSectionIndex=0;
 let testMode=false;
 function inTestMode(){ return testMode && currentUser && currentUser.role==='admin'; }
 
+function patternItems(patternId){ return PATTERN_ITEMS.filter(item=>item.pattern===patternId); }
+function collectedVocabulary(){
+  return new Set(CARDS.filter(card=>seen(card.id)).map(card=>card.en.toLowerCase()));
+}
+function itemVocabularyReady(item,vocabulary=collectedVocabulary()){
+  return inTestMode()||(item.vocab||[]).every(word=>vocabulary.has(word.toLowerCase()));
+}
+function readyPatternItems(patternId){
+  const vocabulary=collectedVocabulary();
+  return patternItems(patternId).filter(item=>itemVocabularyReady(item,vocabulary));
+}
+function learnedSentenceCount(patternId){
+  return patternItems(patternId).filter(item=>(S.patterns[item.id]||{}).ok>0).length;
+}
+function totalLearnedSentences(){
+  return PATTERN_ITEMS.filter(item=>(S.patterns[item.id]||{}).ok>0).length;
+}
+function patternUnlocked(index){
+  if(inTestMode())return true;
+  if(collectedTotal(S)<SENTENCE_UNLOCK_WORDS)return false;
+  if(index===0)return true;
+  return learnedSentenceCount(PATTERN_LIST[index-1].id)>=SENTENCE_UNLOCK_SUCCESSES;
+}
+function openPatternCount(){ return PATTERN_LIST.filter((pattern,index)=>patternUnlocked(index)).length; }
+
+function renderVocabularyLaunch(){
+  const collected=collectedTotal(S);const open=openSectionCount();
+  $('#vocabularyLaunchText').textContent=collected+' z '+CARDS.length+' słów · otwarte sekcje: '+open+' z '+SECTIONS.length+'.';
+  $('#vocabularyLaunchFill').style.width=(collected/CARDS.length*100)+'%';
+}
+
+function renderSentenceLaunch(){
+  const collected=collectedTotal(S);const learned=totalLearnedSentences();const ready=inTestMode()||collected>=SENTENCE_UNLOCK_WORDS;
+  const button=$('#openSentences');button.disabled=!ready;
+  $('#sentenceLaunchText').textContent=ready
+    ? learned+' z '+PATTERN_ITEMS.length+' zdań poznanych · '+openPatternCount()+' z '+PATTERN_LIST.length+' tematów otwartych.'
+    : 'Zbierz jeszcze '+(SENTENCE_UNLOCK_WORDS-collected)+' '+((SENTENCE_UNLOCK_WORDS-collected)===1?'słowo':'słowa')+', aby zacząć układać zdania.';
+  $('#sentenceLaunchFill').style.width=(ready?(learned/PATTERN_ITEMS.length*100):(collected/SENTENCE_UNLOCK_WORDS*100))+'%';
+}
+
+function renderSentenceHub(){
+  if(!inTestMode()&&collectedTotal(S)<SENTENCE_UNLOCK_WORDS){renderHome();show('home');return;}
+  const learned=totalLearnedSentences();
+  $('#sentenceKnownN').textContent=learned;
+  $('#sentenceOpenN').textContent=openPatternCount();
+  $('#sentenceFeatherN').textContent=S.feathers||0;
+  $('#sentenceHubNote').textContent='Każdy temat otwiera się po ułożeniu '+SENTENCE_UNLOCK_SUCCESSES+' różnych zdań w poprzednim. Zdania korzystają ze słów, które masz już w kolekcji. Reguł nie trzeba zapamiętywać — zauważasz wzorzec podczas układania.';
+  const grid=$('#patternGrid');grid.textContent='';
+  PATTERN_LIST.forEach((pattern,index)=>{
+    const learnedHere=learnedSentenceCount(pattern.id);const unlocked=patternUnlocked(index);const available=readyPatternItems(pattern.id);const canPractice=unlocked&&available.length>0;const complete=learnedHere===pattern.items.length;
+    const button=make('button','pattern-card'+(unlocked?'':' locked')+(!available.length&&unlocked?' waiting':'')+(complete?' complete':''));
+    button.type='button';button.disabled=!canPractice;
+    button.setAttribute('aria-label',canPractice?'Ćwicz temat: '+pattern.name:(unlocked?'Zbierz potrzebne słowa do tematu: '+pattern.name:'Temat zablokowany: '+pattern.name));
+    button.append(make('span','pattern-number','ETAP '+(index+1)+' Z '+PATTERN_LIST.length));
+    button.append(make('span','pattern-icon',unlocked?(available.length?'🧱':'⏳'):'🔒'));
+    button.append(make('strong','',pattern.name));
+    if(canPractice)button.append(make('span','pattern-example',pattern.example));
+    const status=make('span','pattern-status');
+    if(unlocked&&!available.length)status.textContent='Nowe zdania pojawią się wraz ze słowami w kolekcji';
+    else if(unlocked)status.textContent=complete?'Wszystkie zdania poznane':learnedHere+' z '+pattern.items.length+' zdań poznanych · '+available.length+' dostępnych';
+    else if(index===0)status.textContent='Najpierw zbierz '+SENTENCE_UNLOCK_WORDS+' słowa';
+    else status.textContent='Najpierw ułóż '+SENTENCE_UNLOCK_SUCCESSES+' zdania w poprzednim etapie';
+    button.append(status);
+    const progress=make('span','pattern-progress');const fill=make('i');fill.style.width=(learnedHere/pattern.items.length*100)+'%';progress.append(fill);button.append(progress);
+    if(canPractice)button.addEventListener('click',()=>beginPatternSession(pattern.id));
+    grid.append(button);
+  });
+  show('sentences');
+}
+
 function enterStudent(){
   $('#studentName').textContent=currentUser.displayName;
   $('#welcomeName').textContent='Cześć, '+currentUser.firstName+'!';
   setSync('zapisano');
+  /* Po aktualizacji aplikacji sprawdzamy także wcześniejsze osiągnięcia.
+     Dzięki temu uczeń, który spełnił warunek przed dodaniem galerii,
+     nie musi wykonywać tego samego zadania ponownie. */
+  const restoredBadges=checkBadges();
+  if(restoredBadges.length)saveProgress();
   renderHome(); show('home');
+  announceBadges(restoredBadges);
+}
+
+function renderSectionsGrid(){
+  const open=openSectionCount();
+  const grid=$('#sectionsGrid');grid.textContent='';
+  SECTIONS.forEach((section,index)=>{
+    const count=sectionCollected(index);
+    const locked=index>=open;
+    const passedExam=sectionPassed(index);
+    const button=make('button','section-card'+(locked?' locked':'')+(passedExam?' passed':''));
+    button.type='button';button.disabled=locked;
+    button.setAttribute('aria-label',locked?'Sekcja '+(index+1)+' zablokowana':'Otwórz sekcję '+section.name);
+    button.append(make('span','number','SEKCJA '+String(index+1).padStart(2,'0')));
+    button.append(make('span','section-card-icon',locked?'🔒':section.icon));
+    button.append(make('strong','',section.name));
+    button.append(make('small','',passedExam?'Egzamin zdany':count+' z 20 słów'));
+    if(locked)button.append(make('span','lock','🔒'));
+    const progress=make('span','card-progress');
+    const fill=make('i');fill.style.width=(passedExam?100:count*5)+'%';progress.append(fill);button.append(progress);
+    if(!locked)button.addEventListener('click',()=>renderSection(index));
+    grid.append(button);
+  });
+}
+
+function renderVocabularyHub(){
+  const collected=collectedTotal(S);const passed=S.passedExams.length;const open=openSectionCount();
+  $('#vocabularyCollectedN').textContent=collected;
+  $('#vocabularyPassedN').textContent=passed;
+  $('#vocabularyOpenN').textContent=open;
+  renderSectionsGrid();
+  show('vocabulary');
 }
 
 function renderHome(){
   const collected=CARDS.filter(card=>seen(card.id)).length;
   const passed=SECTIONS.filter((section,index)=>sectionPassed(index)).length;
   const open=openSectionCount();
+  const badgeCount=(S.badges||[]).length;
   $('#streakN').textContent=S.streak;
   $('#allCollected').textContent=collected;
   $('#passedN').textContent=passed;
   $('#openN').textContent=open;
   $('#featherN').textContent=S.feathers||0;
+  $('#badgeN').textContent=badgeCount;
+  $('#homeBadgeCount').textContent=badgeCount+' z '+BADGES.length+' zdobytych';
+  renderBadgeGallery($('#homeBadgeList'));
+  renderVocabularyLaunch();
+  renderSentenceLaunch();
   const challenge=challengeProgress();
   $('#challengeLine').textContent=challenge?('Wyzwanie dnia: '+challenge.challenge.text):'';
-  const grid=$('#sectionsGrid'); grid.textContent='';
-  SECTIONS.forEach((section,index)=>{
-    const count=sectionCollected(index);
-    const locked=index>=open;
-    const passedExam=sectionPassed(index);
-    const button=make('button','section-card'+(locked?' locked':'')+(passedExam?' passed':''));
-    button.type='button'; button.disabled=locked;
-    button.setAttribute('aria-label',locked?'Sekcja '+(index+1)+' zablokowana':'Otwórz sekcję '+section.name);
-    button.append(make('span','number','SEKCJA '+String(index+1).padStart(2,'0')));
-    button.append(make('span','section-card-icon',locked?'🔒':section.icon));
-    button.append(make('strong','',section.name));
-    button.append(make('small','',passedExam?'Egzamin zdany':count+' z 20 słów'));
-    if(locked) button.append(make('span','lock','🔒'));
-    const progress=make('span','card-progress');
-    const fill=make('i'); fill.style.width=(passedExam?100:count*5)+'%'; progress.append(fill); button.append(progress);
-    if(!locked) button.addEventListener('click',()=>renderSection(index));
-    grid.append(button);
-  });
 }
 
 function renderSection(index){
-  if(index>=openSectionCount()) return renderHome();
+  if(index>=openSectionCount())return renderVocabularyHub();
   currentSectionIndex=index;
   const section=SECTIONS[index];
   const count=sectionCollected(index);
@@ -594,14 +816,26 @@ function startLearning(){
 /* ==================== SESJA CZTEROETAPOWA ==================== */
 
 let stagePlan = [], stageIndex = 0, stageStartedAt = 0, shortSession = false;
+let sessionOrigin = 'section', focusedPatternId = '';
 
 function wordQueue(){ return startLearning(); }
 
 function patternQueue(limit){
-  const pool = PATTERN_ITEMS.filter(item => dueIn(S.patterns,item.id));
-  const fresh = PATTERN_ITEMS.filter(item => !S.patterns[item.id]);
-  const chosen = shuffle(pool.length ? pool : fresh).slice(0,limit);
+  const unlockedIds=new Set(PATTERN_LIST.filter((pattern,index)=>patternUnlocked(index)).map(pattern=>pattern.id));
+  const vocabulary=collectedVocabulary();
+  const available=PATTERN_ITEMS.filter(item=>unlockedIds.has(item.pattern)&&itemVocabularyReady(item,vocabulary));
+  const due=available.filter(item=>S.patterns[item.id]&&dueIn(S.patterns,item.id));
+  const fresh=available.filter(item=>!S.patterns[item.id]);
+  const fallback=available.filter(item=>S.patterns[item.id]&&!dueIn(S.patterns,item.id));
+  const chosen=shuffle(fresh).concat(shuffle(due),shuffle(fallback)).slice(0,limit);
   return chosen.map(item => ({mode:'pattern',item}));
+}
+function focusedPatternQueue(patternId,limit){
+  const available=readyPatternItems(patternId);
+  const fresh=available.filter(item=>!S.patterns[item.id]);
+  const due=available.filter(item=>S.patterns[item.id]&&dueIn(S.patterns,item.id));
+  const fallback=available.filter(item=>S.patterns[item.id]&&!dueIn(S.patterns,item.id));
+  return shuffle(fresh).concat(shuffle(due),shuffle(fallback)).slice(0,limit).map(item=>({mode:'pattern',item}));
 }
 function storyQueue(limit){
   const unseen = STORY_LIST.filter(story => !(S.stories[story.id] || {}).done);
@@ -633,7 +867,7 @@ function detectiveQueue(limit){
 function unlockedModules(){
   const collected = collectedTotal(S);
   return {
-    patterns: collected >= 12,
+    patterns: collected >= SENTENCE_UNLOCK_WORDS,
     stories: collected >= 25 && countOk(S.patterns) >= 5,
     dialogues: collected >= 40 && countOk(S.patterns) >= 12,
     detective: countOk(S.patterns) >= 20 || (S.mistakes||[]).length >= 6
@@ -644,6 +878,7 @@ function unlockedModules(){
    ćwiczenia daje lepsze wyniki w trakcie i gorsze po tygodniu. */
 function buildStage(id){
   const open = unlockedModules();
+  if(id === 'sentences') return focusedPatternQueue(focusedPatternId,6);
   if(id === 'warmup') return wordQueue();
   if(id === 'core'){
     const items = [];
@@ -668,12 +903,24 @@ function buildStage(id){
 }
 
 function beginSession(short){
+  sessionOrigin = 'section';focusedPatternId='';
   shortSession = Boolean(short);
   stagePlan = STAGE_PLAN.filter(stage => !shortSession || stage.short > 0);
   stageIndex = 0;
   done = 0; hits = 0; added = []; sessionRun++;
   startedAt = Date.now();
   dailyCounters = {};
+  startStage();
+}
+
+function beginPatternSession(patternId){
+  const index=PATTERN_LIST.findIndex(pattern=>pattern.id===patternId);
+  if(index<0||!patternUnlocked(index))return;
+  if(!readyPatternItems(patternId).length){toast('Najpierw zbierz słowa potrzebne do tych zdań.');return;}
+  const pattern=PATTERN_LIST[index];
+  sessionOrigin='sentences';focusedPatternId=patternId;shortSession=false;
+  stagePlan=[{id:'sentences',name:pattern.name,ms:10*60*1000,short:10*60*1000}];
+  stageIndex=0;done=0;hits=0;added=[];sessionRun++;startedAt=Date.now();dailyCounters={};
   startStage();
 }
 
@@ -685,7 +932,9 @@ function startStage(){
   queue = buildStage(stage.id);
   if(!queue.length){ stageIndex++; return startStage(); }
   stageStartedAt = Date.now();
-  $('#playSectionName').textContent = stage.name + ' · ' + SECTIONS[currentSectionIndex].name;
+  $('#playSectionName').textContent = sessionOrigin==='sentences'
+    ? 'Klocki zdań · '+stage.name
+    : stage.name + ' · ' + SECTIONS[currentSectionIndex].name;
   show('play');
   nextStep();
 }
@@ -700,6 +949,20 @@ function endStage(){
 
 /* Ekran przejściowy nie jest ozdobnikiem: krótka przerwa poznawcza
    między blokami różnych zadań poprawia to, co z nich zostaje. */
+function appendBilingualJourneyFact(host,stop){
+  const block=make('div','swift-fact');
+  block.append(make('strong','fact-language','Polski'));
+  block.append(make('p','break-fact fact-polish',stop.fact));
+  block.append(make('strong','fact-language','English'));
+  block.append(make('p','break-fact fact-english',stop.factEn));
+  const listenEnglish=make('button','fact-listen','🔊 Posłuchaj po angielsku');
+  listenEnglish.type='button';
+  listenEnglish.setAttribute('aria-label','Odtwórz angielską wersję opowieści');
+  listenEnglish.addEventListener('click',()=>speakSentence(stop.factEn));
+  block.append(listenEnglish);
+  host.append(block);
+}
+
 function renderStageBreak(){
   const next = stagePlan[stageIndex];
   const host = $('#breakBody');
@@ -707,7 +970,7 @@ function renderStageBreak(){
   const stop = JOURNEY_STOPS[journeyIndex()];
   if(stop){
     host.append(make('p','break-place',stop.place + ', ' + stop.country));
-    host.append(make('p','break-fact',stop.fact));
+    appendBilingualJourneyFact(host,stop);
   }
   host.append(make('p','break-next','Następny etap: ' + next.name));
   const progress = challengeProgress();
@@ -855,12 +1118,17 @@ function finishLearning(){
   const earned = checkBadges();
   saveProgress();
 
-  const count = sectionCollected(currentSectionIndex);
-  $('#dNew').textContent = added.length;
-  $('#dOk').textContent = hits;
-  $('#dSection').textContent = count;
+  const sentenceSession=sessionOrigin==='sentences';
+  const count=sectionCollected(currentSectionIndex);
+  $('#dNew').textContent=sentenceSession?done:added.length;
+  $('#dOk').textContent=hits;
+  $('#dSection').textContent=sentenceSession?totalLearnedSentences():count;
   $('#dFeathers').textContent = S.feathers || 0;
-  $('#doneTitle').textContent = added.length ? 'Kolekcja rośnie!' : 'Sesja zakończona!';
+  $('#dNewLabel').textContent=sentenceSession?'wykonanych zadań':'nowe słowa';
+  $('#dOkLabel').textContent=sentenceSession?'bez błędu':'trafione';
+  $('#dSectionLabel').textContent=sentenceSession?'z 70 zdań poznanych':'z 20 zebranych';
+  $('#doneTitle').textContent=sentenceSession?'Zdania przećwiczone!':(added.length?'Kolekcja rośnie!':'Sesja zakończona!');
+  $('#doneBack').textContent=sentenceSession?'Wróć do klocków zdań':'Wróć do sekcji';
 
   const list = $('#dList'); list.textContent = '';
   added.forEach(card => list.append(make('span','',card.ic+' '+card.en)));
@@ -876,7 +1144,7 @@ function finishLearning(){
   }else note.textContent = '';
 
   const action = $('#doneAction'); action.textContent = '';
-  if(count === 20 && !sectionPassed(currentSectionIndex)){
+  if(!sentenceSession&&count === 20 && !sectionPassed(currentSectionIndex)){
     const button = make('button','primary wide','Zdaj egzamin'); button.type = 'button';
     button.addEventListener('click',()=>startExam(currentSectionIndex));
     action.append(button);
@@ -978,7 +1246,7 @@ function advanceExam(){
   const stop = JOURNEY_STOPS[journeyIndex()];
   if(stop){
     complete.append(make('p','break-place','Jerzyk doleciał do: '+stop.place+', '+stop.country));
-    complete.append(make('p','break-fact',stop.fact));
+    appendBilingualJourneyFact(complete,stop);
   }
   if(examMisses === 0) complete.append(make('p','break-challenge','Egzamin bez ani jednej pomyłki.'));
   announceBadges(earned);
@@ -1015,7 +1283,7 @@ async function renderStudents(){
     students.forEach(student=>{
       const row=make('tr');
       const name=make('td');name.append(make('strong','',student.displayName));
-      row.append(name,make('td','',student.wordsCollected+' / 500'),make('td','',student.currentSection+' / 25'),make('td','',String(student.examsPassed)),make('td','',formatActivity(student.lastActive)));
+      row.append(name,make('td','',student.wordsCollected+' / 500'),make('td','',(student.sentencesCompleted||0)+' / 70'),make('td','',student.currentSection+' / 25'),make('td','',String(student.examsPassed)),make('td','',formatActivity(student.lastActive)));
       const action=make('td');const reset=make('button','reset-pin','Nowy PIN');reset.type='button';reset.addEventListener('click',()=>resetStudentPin(student));action.append(reset);row.append(action);body.append(row);
     });
   }catch(problem){error.textContent=problem.message;if(problem.status===401)show('admin-login');}
@@ -1034,18 +1302,25 @@ async function resetStudentPin(student){
 }
 
 /* ==================== ZDARZENIA I START ==================== */
+['loginPin','regPin','regPinRepeat'].forEach(id=>{
+  const input=$('#'+id);
+  input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,4);});
+});
 $('#openRegister').addEventListener('click',()=>{$('#registerError').textContent='';show('register');});
 $('#backFromRegister').addEventListener('click',()=>show('login'));
 $('#studentRegister').addEventListener('submit',async event=>{
   event.preventDefault();
   const error=$('#registerError');error.textContent='';
+  const pin=$('#regPin').value;const repeat=$('#regPinRepeat').value;
+  if(!/^\d{4}$/.test(pin)){error.textContent='PIN musi mieć dokładnie 4 cyfry.';$('#regPin').focus();return;}
+  if(pin!==repeat){error.textContent='Oba PIN-y muszą być takie same.';$('#regPinRepeat').focus();return;}
   const button=event.submitter||event.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
   try{
     const data=await api('/api/student/register',{method:'POST',body:{
       firstName:$('#regFirstName').value,
       lastInitial:$('#regLastInitial').value,
-      pin:$('#regPin').value,
-      pinRepeat:$('#regPinRepeat').value
+      pin,
+      pinRepeat:repeat
     }});
     currentUser=data.user;await loadProgress();enterStudent();event.target.reset();
   }catch(problem){error.textContent=problem.message;}finally{button.disabled=false;}
@@ -1058,9 +1333,11 @@ $('#leaveTestMode').addEventListener('click',()=>{stopSpeech();clearTimeout(adva
 $('#openAdminLogin').addEventListener('click',()=>show('admin-login'));
 $('#backToStudentLogin').addEventListener('click',()=>show('login'));
 $('#studentLogin').addEventListener('submit',async event=>{
-  event.preventDefault();const error=$('#loginError');error.textContent='';const button=event.submitter||event.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
+  event.preventDefault();const error=$('#loginError');error.textContent='';const pin=$('#loginPin').value;
+  if(!/^\d{4}$/.test(pin)){error.textContent='PIN musi mieć dokładnie 4 cyfry.';$('#loginPin').focus();return;}
+  const button=event.submitter||event.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
   try{
-    const data=await api('/api/student/login',{method:'POST',body:{firstName:$('#loginFirstName').value,lastInitial:$('#loginLastInitial').value,pin:$('#loginPin').value}});
+    const data=await api('/api/student/login',{method:'POST',body:{firstName:$('#loginFirstName').value,lastInitial:$('#loginLastInitial').value,pin}});
     currentUser=data.user;await loadProgress();enterStudent();event.target.reset();
   }catch(problem){error.textContent=problem.message;}finally{button.disabled=false;}
 });
@@ -1074,9 +1351,13 @@ async function logout(){
   clearCredentials();currentUser=null;S=emptyState();show('login');
 }
 $('#studentLogout').addEventListener('click',logout);$('#adminLogout').addEventListener('click',logout);
-$('#sectionBack').addEventListener('click',()=>{renderHome();show('home');});
-$('#quit').addEventListener('click',()=>{sessionRun++;stopSpeech();clearTimeout(advanceTimer);renderSection(currentSectionIndex);});
-$('#doneBack').addEventListener('click',()=>renderSection(currentSectionIndex));
+$('#openVocabulary').addEventListener('click',renderVocabularyHub);
+$('#vocabularyBack').addEventListener('click',()=>{renderHome();show('home');});
+$('#sectionBack').addEventListener('click',renderVocabularyHub);
+$('#openSentences').addEventListener('click',renderSentenceHub);
+$('#sentencesBack').addEventListener('click',()=>{renderHome();show('home');});
+$('#quit').addEventListener('click',()=>{sessionRun++;stopSpeech();clearTimeout(advanceTimer);if(sessionOrigin==='sentences')renderSentenceHub();else renderSection(currentSectionIndex);});
+$('#doneBack').addEventListener('click',()=>{if(sessionOrigin==='sentences')renderSentenceHub();else renderSection(currentSectionIndex);});
 $('#examQuit').addEventListener('click',()=>{stopSpeech();renderSection(currentSectionIndex);});
 $('#refreshStudents').addEventListener('click',renderStudents);
 $('#createStudent').addEventListener('submit',async event=>{
@@ -1151,6 +1432,27 @@ function grantBadge(id){
   S.badges.push(id);
   return badge;
 }
+
+function renderBadgeGallery(host){
+  if(!host)return;
+  host.textContent='';
+  BADGES.forEach(badge=>{
+    const owned=(S.badges||[]).includes(badge.id);
+    const chip=make('button','badge-card '+(owned?'owned':'locked'));
+    chip.type='button';
+    chip.title=owned?'Otwórz opowieść odznaki':'Warunek: '+badge.desc;
+    chip.setAttribute('aria-label',owned
+      ? 'Zdobyta odznaka '+badge.name+'. Otwórz opowieść.'
+      : 'Odznaka '+badge.name+' jeszcze niezdobyta. Warunek: '+badge.desc+'.');
+    chip.append(make('span','badge-icon',badge.icon||'🏅'));
+    chip.append(make('strong','',badge.name));
+    chip.append(make('span','badge-desc',badge.desc));
+    chip.append(make('span','badge-state',owned?'✓ Zdobyta · przeczytaj opowieść':'🔒 Do zdobycia'));
+    if(owned)chip.addEventListener('click',()=>{badgeQueue=[badge];showNextBadge();});
+    else chip.addEventListener('click',()=>toast('Warunek odznaki „'+badge.name+'”: '+badge.desc+'.'));
+    host.append(chip);
+  });
+}
 /* Odznaki pokazujemy w oknie, nie jako znikający napis: zdobycie odznaki
    ma być momentem, a nie komunikatem, który dziecko przegapi.
    Kilka odznak naraz ustawia się w kolejce, jedna po drugiej. */
@@ -1171,7 +1473,19 @@ function showNextBadge(){
   $('#badgeDesc').textContent = badge.desc;
   $('#badgeReward').textContent = badge.reward || '';
   const story = $('#badgeStory');
-  story.textContent = badge.story || '';
+  story.textContent = '';
+  if(badge.story){
+    story.append(make('strong','story-language','Polski'));
+    story.append(make('p','story-language-text',badge.story));
+  }
+  if(badge.storyEn){
+    story.append(make('strong','story-language','English'));
+    story.append(make('p','story-language-text',badge.storyEn));
+    const listenEnglish=make('button','hear story-listen','🔊 Posłuchaj po angielsku');
+    listenEnglish.type='button';
+    listenEnglish.addEventListener('click',()=>speakSentence(badge.storyEn));
+    story.append(listenEnglish);
+  }
   story.hidden = true;
   $('#badgeStoryButton').textContent = 'Przeczytaj historyjkę';
   $('#badgeStoryButton').hidden = !badge.story;
@@ -1183,6 +1497,7 @@ function showNextBadge(){
 }
 
 function closeBadge(){
+  stopSpeech();
   $('#badgeModal').hidden = true;
   if(badgeQueue.length) setTimeout(showNextBadge,350);
 }
@@ -1190,13 +1505,15 @@ function closeBadge(){
 $('#badgeStoryButton').addEventListener('click',()=>{
   const story = $('#badgeStory');
   story.hidden = !story.hidden;
+  if(story.hidden)stopSpeech();
   $('#badgeStoryButton').textContent = story.hidden ? 'Przeczytaj historyjkę' : 'Zwiń historyjkę';
 });
 $('#badgeRewardButton').addEventListener('click',()=>{
+  stopSpeech();
   badgeQueue = [];
   $('#badgeModal').hidden = true;
-  renderMap();
   show('map');
+  renderMap();
 });
 $('#badgeClose').addEventListener('click',closeBadge);
 
@@ -1247,16 +1564,170 @@ function answerAvoids(answer,avoid){
    z liczby udanych powtórek tego konkretnego zdania. */
 function patternLevel(id){ return (S.patterns[id]||{}).r || 0; }
 
+/* Najdłuższy wspólny podciąg zaznacza fragmenty, które zachowują dobrą
+   kolejność. Dzięki temu jeden zbędny klocek nie koloruje całego zdania
+   na czerwono tylko dlatego, że przesunął dalsze słowa o jedno miejsce. */
+function sentenceMatchMarks(placed,target){
+  const rows=placed.length+1;const columns=target.length+1;
+  const table=Array.from({length:rows},()=>Array(columns).fill(0));
+  for(let i=placed.length-1;i>=0;i--){
+    for(let j=target.length-1;j>=0;j--){
+      table[i][j]=placed[i]===target[j]
+        ? table[i+1][j+1]+1
+        : Math.max(table[i+1][j],table[i][j+1]);
+    }
+  }
+  const marks=Array(placed.length).fill(false);let i=0;let j=0;
+  while(i<placed.length&&j<target.length){
+    if(placed[i]===target[j]&&table[i][j]===table[i+1][j+1]+1){marks[i]=true;i++;j++;continue;}
+    if(table[i+1][j]>=table[i][j+1])i++;else j++;
+  }
+  return marks;
+}
+
+function sentenceTextFromTokens(tokens){
+  const question=tokens.includes('?');
+  const words=tokens.filter(token=>token!=='?');
+  return words.join(' ')+(question?'?':'.');
+}
+
+/* Pisownia jest osobną umiejętnością od układania. Pomijamy wyłącznie
+   przypadkowe spacje na początku i końcu; wielka litera, odstępy wewnątrz
+   zdania oraz znak końcowy muszą zgadzać się dokładnie. */
+function sentenceSpellingMatches(typed,target){
+  return String(typed||'').trim()===String(target||'');
+}
+
+function markedSentenceAnswer(typed,target){
+  const answer=[...String(typed||'').trim()];
+  const model=[...String(target||'')];
+  const length=Math.max(answer.length,model.length);
+  let html='';
+  for(let index=0;index<length;index++){
+    const actual=answer[index];
+    const expected=model[index];
+    if(actual===undefined){html+='<span class="ch missing">□</span>';continue;}
+    const shown=actual===' '?'·':actual;
+    html+='<span class="ch '+(actual===expected?'y':'n')+'">'+escapeHtml(shown)+'</span>';
+  }
+  return html;
+}
+
+function sentenceSpellingHint(typed,target){
+  const answer=String(typed||'').trim();
+  if(!answer)return 'Najpierw wpisz całe zdanie.';
+  if(answer.toLowerCase()===target.toLowerCase()&&answer!==target)return 'Sprawdź wielką literę na początku zdania.';
+  if(/\s{2,}/.test(answer))return 'Między wyrazami zostawiamy jedną spację.';
+  if(!/[?.!]$/.test(answer))return 'Na końcu brakuje kropki albo znaku zapytania.';
+  if(answer.endsWith('.')&&target.endsWith('?'))return 'To jest pytanie — zakończ je znakiem zapytania.';
+  if(answer.endsWith('?')&&target.endsWith('.'))return 'To nie jest pytanie — zakończ zdanie kropką.';
+  return 'Porównaj kolorowe znaki ze wzorem i popraw czerwone miejsca.';
+}
+
+function grammarExampleTokens(text){
+  return String(text||'').match(/[A-Za-z]+(?:['’][A-Za-z]+)?|-[A-Za-z]+|[?.!,]/g)||[];
+}
+
+function grammarSpeechText(token){
+  const spoken={
+    '?':'question mark',
+    '.':'full stop',
+    ',':'comma',
+    '!':'exclamation mark',
+    '-s':'s ending',
+    '-ing':'ing ending'
+  };
+  return spoken[token]||token;
+}
+
+function appendGrammarBricks(host,tokens,className='grammar-bricks'){
+  const row=make('span',className);
+  (tokens||[]).forEach(token=>{
+    const spoken=grammarSpeechText(token);
+    const brick=make('button','grammar-brick grammar-audio'+(/^[?.!,]$/.test(token)?' punctuation':''),token);
+    brick.type='button';
+    brick.title='Posłuchaj wymowy';
+    brick.setAttribute('aria-label','Odtwórz po angielsku: '+spoken);
+    const icon=make('span','grammar-audio-icon','🔊');
+    icon.setAttribute('aria-hidden','true');
+    brick.append(icon);
+    brick.addEventListener('click',()=>say(spoken));
+    row.append(brick);
+  });
+  host.append(row);
+  return row;
+}
+
+function appendGrammarParts(host,parts,formula=false){
+  (parts||[]).forEach((part,index)=>{
+    if(formula&&index)host.append(make('span','grammar-plus','+'));
+    if(part.pl)host.append(make('span','grammar-polish',part.pl));
+    if(part.en)appendGrammarBricks(host,part.en,'grammar-bricks inline');
+  });
+}
+
+function buildGrammarHelp(patternId){
+  const guide=GRAMMAR_GUIDES[patternId]||GRAMMAR_GUIDES['to-be-positive'];
+  const details=make('details','sentence-help');
+  details.append(make('summary','','Potrzebuję podpowiedzi'));
+  const body=make('div','sentence-help-body');
+  body.append(make('strong','grammar-label','Plan zdania'));
+  const formula=make('div','grammar-formula');
+  appendGrammarParts(formula,guide.formula,true);
+  body.append(formula);
+  body.append(make('strong','grammar-label','Przykład z klocków'));
+  const examples=make('div','grammar-examples');
+  guide.examples.forEach(tokens=>appendGrammarBricks(examples,tokens));
+  body.append(examples);
+  body.append(make('strong','grammar-label','Zapamiętaj'));
+  const tip=make('div','grammar-tip');
+  appendGrammarParts(tip,guide.tip);
+  body.append(tip);
+  body.append(make('strong','grammar-label','Mały słownik'));
+  const terms=make('ul','grammar-list');
+  guide.terms.forEach(term=>{
+    const entry=GRAMMAR_TERMS[term];
+    const row=make('li','grammar-term');
+    const heading=make('div','grammar-term-title');
+    heading.append(make('strong','',entry.label));
+    appendGrammarBricks(heading,[entry.english],'grammar-bricks inline');
+    row.append(heading,make('p','grammar-definition',entry.definition));
+    appendGrammarBricks(row,entry.examples);
+    terms.append(row);
+  });
+  body.append(terms);
+  body.append(make('strong','grammar-label','Dobre nawyki'));
+  const habits=make('ul','grammar-list grammar-habits');
+  [
+    'Pierwszy wyraz zdania zaczynamy wielką literą.',
+    'Pytanie kończymy znakiem zapytania. Zdanie oznajmujące kończymy kropką.',
+    'Najpierw znajdź osobę lub rzecz, potem czasownik, a na końcu szczegóły.',
+    'Przed sprawdzeniem przeczytaj zdanie od lewej do prawej i posłuchaj, czy brzmi logicznie.',
+    'Po ułożeniu przepisz całe zdanie. Dopiero potem posłuchaj wzoru i przeczytaj zdanie na głos.'
+  ].forEach(text=>habits.append(make('li','',text)));
+  body.append(habits);
+  details.append(body);
+  return details;
+}
+
 function renderPattern(stage,item){
   const level = patternLevel(item.id);
   const useExtra = level >= 1;
   const showHint = level < 2;
 
   const prompt = make('div','prompt');
-  prompt.append(make('p','ask','Ułóż zdanie po angielsku'));
+  prompt.append(make('p','ask','Krok 1 z 3 · Ułóż zdanie po angielsku'));
   prompt.append(make('p','pattern-pl',item.pl));
-  if(showHint) prompt.append(make('p','pattern-hint','Przykład: '+item.example));
+  if(showHint){
+    const hint=make('div','pattern-hint');
+    hint.append(make('span','pattern-hint-label','Przykład'));
+    appendGrammarBricks(hint,grammarExampleTokens(item.example));
+    prompt.append(hint);
+  }
   stage.append(prompt);
+
+  const grammarHelp=buildGrammarHelp(item.pattern);
+  stage.append(grammarHelp);
 
   const line = make('div','sentence-line');
   line.setAttribute('aria-label','Twoje zdanie');
@@ -1266,36 +1737,74 @@ function renderPattern(stage,item){
   stage.append(bank);
 
   const feedback = make('p','fb','');
+  feedback.setAttribute('aria-live','polite');
   stage.append(feedback);
 
   const placed = [];
   const target = item.tokens;
+  const sentenceText=sentenceTextFromTokens(target);
   const pool = shuffle(useExtra ? target.concat(item.extra) : target.slice());
+  let reviewed = false;
+  let arrangementReady = false;
+  let spellingReady = false;
+  let completed = false;
 
   function refreshLine(){
     line.textContent = '';
-    placed.forEach((token,index) => {
-      const brick = make('button','brick placed',token);
+    const tokens=placed.map(item=>item.token);
+    const marks=reviewed?sentenceMatchMarks(tokens,target):[];
+    placed.forEach((item,index) => {
+      const correct=reviewed&&marks[index];
+      const slot=make('span','brick-slot'+(reviewed?(correct?' correct':' incorrect'):''));
+      const brick=make('button','brick placed'+(reviewed?(correct?' right':' wrong'):''),item.token);
       brick.type = 'button';
-      brick.addEventListener('click',()=>{
-        placed.splice(index,1);
-        const back = bank.querySelector('[data-token="'+cssEscape(token)+'"][disabled]');
-        if(back) back.disabled = false;
-        refreshLine(); refreshCheck();
-      });
-      line.append(brick);
+      if(correct){
+        brick.disabled=true;
+        brick.setAttribute('aria-label',item.token+' — poprawne miejsce');
+      }else{
+        brick.setAttribute('aria-label',reviewed?'Usuń błędny klocek: '+item.token:'Odłóż klocek: '+item.token);
+        brick.addEventListener('click',()=>{
+          const removed=placed.splice(index,1)[0];
+          if(removed&&removed.source)removed.source.disabled=false;
+          refreshLine();refreshCheck();
+        });
+      }
+      slot.append(brick);
+      if(reviewed&&!correct){
+        const controls=make('span','brick-moves');
+        const left=make('button','brick-move','←');left.type='button';left.disabled=index===0;
+        left.setAttribute('aria-label','Przesuń '+item.token+' w lewo');
+        left.addEventListener('click',()=>moveBrick(index,-1));
+        const right=make('button','brick-move','→');right.type='button';right.disabled=index===placed.length-1;
+        right.setAttribute('aria-label','Przesuń '+item.token+' w prawo');
+        right.addEventListener('click',()=>moveBrick(index,1));
+        controls.append(left,right);slot.append(controls);
+      }
+      line.append(slot);
     });
     if(!placed.length) line.append(make('span','line-empty','Dotknij klocków poniżej'));
+    if(reviewed&&tokens.length===target.length&&marks.every(Boolean)){
+      feedback.className='fb good';
+      feedback.textContent='Wszystkie klocki są zielone. Sprawdź poprawione zdanie.';
+    }
   }
-  function refreshCheck(){ checkButton.disabled = placed.length !== target.length; }
+  function moveBrick(index,direction){
+    const destination=index+direction;
+    if(destination<0||destination>=placed.length)return;
+    const moving=placed[index];placed[index]=placed[destination];placed[destination]=moving;
+    refreshLine();refreshCheck();
+  }
+  function refreshCheck(){
+    checkButton.disabled=placed.length!==target.length;
+    checkButton.textContent=reviewed?'Sprawdź ponownie':'Sprawdź';
+  }
 
   pool.forEach(token => {
     const brick = make('button','brick',token);
     brick.type = 'button';
-    brick.dataset.token = token;
     brick.addEventListener('click',()=>{
       if(placed.length >= target.length) return;
-      placed.push(token); brick.disabled = true;
+      placed.push({token,source:brick});brick.disabled=true;
       refreshLine(); refreshCheck();
     });
     bank.append(brick);
@@ -1306,40 +1815,232 @@ function renderPattern(stage,item){
   checkButton.disabled = true;
   stage.append(checkButton);
 
+  const copyPanel=make('section','sentence-copy');
+  copyPanel.hidden=true;
+  copyPanel.append(make('p','sentence-copy-step','Krok 2 z 3'));
+  copyPanel.append(make('p','sentence-copy-title','Teraz przepisz całe zdanie'));
+  copyPanel.append(make('p','sentence-copy-instruction','Przepisz dokładnie. Pamiętaj o wielkiej literze, jednej spacji między wyrazami i znaku na końcu.'));
+  copyPanel.append(make('div','sentence-copy-model',sentenceText));
+  const copyInput=make('input','inp sentence-copy-input');
+  copyInput.type='text';copyInput.placeholder='Wpisz tutaj całe zdanie';
+  copyInput.autocapitalize='off';copyInput.autocomplete='off';copyInput.spellcheck=false;
+  copyInput.setAttribute('autocorrect','off');copyInput.setAttribute('enterkeyhint','done');
+  copyInput.setAttribute('aria-label','Przepisz całe angielskie zdanie');
+  const copyFeedback=make('div','sentence-copy-feedback','');
+  copyFeedback.setAttribute('aria-live','polite');
+  const copyCheckButton=make('button','next','Sprawdź pisownię');
+  copyCheckButton.type='button';
+  copyPanel.append(copyInput,copyFeedback,copyCheckButton);
+  stage.append(copyPanel);
+
+  const speechPanel=make('section','sentence-speech');
+  speechPanel.hidden=true;
+  speechPanel.append(make('p','sentence-copy-step','Krok 3 z 3'));
+  speechPanel.append(make('p','sentence-speech-title','Teraz przeczytaj całe zdanie'));
+  const speechStatus=make('p','mic-status','Najpierw posłuchaj wzoru.');
+  speechStatus.setAttribute('aria-live','polite');
+  const readButton=make('button','next','Przeczytaj zdanie na głos');
+  readButton.type='button';readButton.disabled=true;
+  const heard=make('p','heard','');
+  const contrastBox=make('div','sentence-contrast');
+  contrastBox.hidden=true;
+  contrastBox.append(make('p','contrast-intro','Porównaj brzmienie dopiero po poprawieniu układu.'));
+  const wrongContrast=make('div','contrast-line wrong');
+  wrongContrast.append(make('strong','','Wcześniejsza błędna wersja'));
+  const wrongContrastText=make('span','','');wrongContrast.append(wrongContrastText);
+  const correctContrast=make('div','contrast-line correct');
+  correctContrast.append(make('strong','','Poprawna wersja'));
+  const correctContrastText=make('span','','');correctContrast.append(correctContrastText);
+  const contrastButton=make('button','secondary contrast-listen','🔊 Porównaj: błędne → poprawne');
+  contrastButton.type='button';contrastButton.disabled=true;
+  contrastBox.append(wrongContrast,correctContrast,contrastButton);
+  const resultActions=make('div','sentence-result-actions');
+  resultActions.hidden=true;
+  const replayButton=make('button','secondary','🔊 Posłuchaj jeszcze raz');
+  replayButton.type='button';
+  const nextSentenceButton=make('button','next','Następne zdanie');
+  nextSentenceButton.type='button';
+  resultActions.append(replayButton,nextSentenceButton);
+  speechPanel.append(speechStatus,contrastBox,readButton,heard,resultActions);
+  stage.append(speechPanel);
+
   let attempts = 0;
+  let copyAttempts = 0;
+  let testSkip=null;
+  let copySkip=null;
+  let lastIncorrectSentence='';
+
+  function finishSentence(){
+    if(completed||!spellingReady)return;
+    completed=true;
+    speechPanel.classList.add('passed');
+    speechStatus.textContent='Świetnie! Zdanie zostało ułożone, przepisane i przeczytane poprawnie.';
+    heard.textContent='Zaliczone: '+sentenceText;
+    readButton.hidden=true;
+    if(!contrastBox.hidden)contrastButton.disabled=!hasTTS;
+    if(testSkip)testSkip.hidden=true;
+    resultActions.hidden=false;
+    const flawless=attempts===0&&copyAttempts===0;
+    gradeIn(S.patterns,item.id,flawless);
+    if(flawless){ hits++; award('patternPerfect'); }
+    done++;saveProgress();
+  }
+
+  function enableReading(){
+    if(completed||!arrangementReady||!spellingReady)return;
+    if(!contrastBox.hidden)contrastButton.disabled=!hasTTS;
+    if(!hasSpeechRecognition){
+      speechStatus.textContent='Do zaliczenia zdania potrzebny jest mikrofon. Otwórz aplikację w Chrome i zezwól na dostęp.';
+      readButton.textContent='Mikrofon jest wymagany';readButton.disabled=true;
+      return;
+    }
+    speechStatus.textContent='Teraz przeczytaj całe zdanie od początku do końca.';
+    readButton.textContent='Przeczytaj zdanie na głos';readButton.disabled=false;
+  }
+
+  function playSentenceModel(){
+    readButton.disabled=true;
+    contrastButton.disabled=true;
+    speechStatus.textContent='Słuchaj uważnie. Zdanie brzmi w naturalnym tempie.';
+    speakSentence(sentenceText,enableReading);
+  }
+
+  function acceptSpelling(){
+    if(spellingReady)return;
+    spellingReady=true;
+    copyPanel.classList.add('passed');
+    copyInput.value=sentenceText;copyInput.disabled=true;
+    copyCheckButton.hidden=true;
+    if(copySkip)copySkip.hidden=true;
+    copyFeedback.className='sentence-copy-feedback good';
+    copyFeedback.textContent='Pisownia poprawna. Teraz posłuchaj i przeczytaj zdanie na głos.';
+    speechPanel.hidden=false;
+    playSentenceModel();
+  }
+
+  function checkSpelling(){
+    if(spellingReady)return;
+    if(sentenceSpellingMatches(copyInput.value,sentenceText)){acceptSpelling();return;}
+    copyAttempts++;
+    noteMistake('sentence-spelling',item.id);
+    copyFeedback.className='sentence-copy-feedback bad';
+    copyFeedback.innerHTML='<span class="spelling-marked" aria-hidden="true">'+markedSentenceAnswer(copyInput.value,sentenceText)+'</span><span class="spelling-hint">'+escapeHtml(sentenceSpellingHint(copyInput.value,sentenceText))+'</span>';
+    copyInput.focus();
+  }
+
+  copyCheckButton.addEventListener('click',checkSpelling);
+  copyInput.addEventListener('keydown',event=>{
+    if(event.key==='Enter'){event.preventDefault();checkSpelling();}
+  });
+
+  readButton.addEventListener('click',()=>{
+    readButton.disabled=true;readButton.textContent='Słucham…';
+    contrastButton.disabled=true;
+    speechStatus.textContent='Czytaj teraz całe zdanie.';heard.textContent='';
+    listen(sentenceText,result=>{
+      if(result.fatal){
+        speechStatus.textContent=result.msg||'Mikrofon jest niedostępny.';
+        readButton.textContent='Mikrofon niedostępny';readButton.disabled=true;
+        return;
+      }
+      if(result.ok){
+        speechPanel.classList.add('good');
+        finishSentence();
+        return;
+      }
+      noteMistake('sentence-speech',item.id);
+      speechStatus.textContent='Nie udało się jeszcze potwierdzić całego zdania. Posłuchaj wzoru i spróbuj ponownie.';
+      readButton.textContent='Powiedz jeszcze raz';readButton.disabled=true;
+      speakSentence(sentenceText,()=>{
+        if(!completed){
+          speechStatus.textContent='Spróbuj jeszcze raz. Czytaj spokojnie od pierwszego do ostatniego słowa.';
+          readButton.disabled=false;
+          if(!contrastBox.hidden)contrastButton.disabled=!hasTTS;
+        }
+      });
+    },sentencePronunciationMatches);
+  });
+
+  /* Nie odtwarzamy błędu automatycznie. Dopiero po samodzielnej korekcie
+     dziecko może świadomie porównać jedną wcześniejszą próbę z prawidłowym
+     wzorcem, który zawsze wybrzmiewa jako drugi i ostatni. */
+  contrastButton.addEventListener('click',()=>{
+    if(!lastIncorrectSentence||!hasTTS)return;
+    contrastButton.disabled=true;readButton.disabled=true;replayButton.disabled=true;
+    speechStatus.textContent='Najpierw wcześniejsza błędna wersja…';
+    speakSentence(lastIncorrectSentence,()=>{
+      const comparisonToken=speechToken;
+      speechStatus.textContent='Teraz poprawna wersja.';
+      setTimeout(()=>{
+        if(comparisonToken!==speechToken)return;
+        speakSentence(sentenceText,()=>{
+          replayButton.disabled=false;
+          contrastButton.disabled=false;
+          if(completed){
+            speechStatus.textContent='Porównanie zakończone. Poprawna wersja zawsze była ostatnia.';
+          }else{
+            enableReading();
+          }
+        });
+      },550);
+    });
+  });
+
+  replayButton.addEventListener('click',()=>{
+    replayButton.disabled=true;contrastButton.disabled=true;
+    speechStatus.textContent='Słuchaj jeszcze raz.';
+    speakSentence(sentenceText,()=>{
+      replayButton.disabled=false;
+      if(!contrastBox.hidden)contrastButton.disabled=!hasTTS;
+      speechStatus.textContent='Zdanie zaliczone. Możesz posłuchać ponownie albo przejść dalej.';
+    });
+  });
+  nextSentenceButton.addEventListener('click',()=>{
+    stopSpeech();clearTimeout(advanceTimer);nextStep();
+  });
+
+  if(inTestMode()){
+    copySkip=makeSkip('Pomiń przepisywanie zdania',acceptSpelling);
+    copyPanel.append(copySkip);
+    testSkip=makeSkip('Pomiń czytanie zdania',finishSentence);
+    speechPanel.append(testSkip);
+  }
+
   checkButton.addEventListener('click',()=>{
-    const answer = placed.join(' ');
+    const answer = placed.map(entry=>entry.token).join(' ');
     const correct = answer === target.join(' ');
     if(correct){
+      reviewed=true;arrangementReady=true;refreshLine();
       feedback.className = 'fb good';
-      feedback.textContent = target.join(' ');
-      checkButton.disabled = true;
+      feedback.textContent = 'Zdanie jest ułożone poprawnie: '+sentenceText;
+      checkButton.disabled = true;checkButton.hidden=true;bank.hidden=true;
       bank.querySelectorAll('.brick').forEach(brick => brick.disabled = true);
-      gradeIn(S.patterns,item.id,attempts === 0);
-      if(attempts === 0){ hits++; award('patternPerfect'); }
-      done++; saveProgress();
-      say(target.filter(token => token !== '?').join(' '));
-      clearTimeout(advanceTimer);
-      advanceTimer = setTimeout(nextStep,900);
+      if(lastIncorrectSentence){
+        wrongContrastText.textContent=lastIncorrectSentence;
+        correctContrastText.textContent=sentenceText;
+        contrastBox.hidden=false;
+      }
+      copyPanel.hidden=false;
+      copyInput.focus();
       return;
     }
     attempts++;
+    lastIncorrectSentence=sentenceTextFromTokens(placed.map(entry=>entry.token));
     gradeIn(S.patterns,item.id,false);
     noteMistake('pattern',item.id);
     feedback.className = 'fb bad';
-    /* Podpowiedź kierunkowa, nie gotowa odpowiedź: dziecko ma poprawić samo. */
-    const firstWrong = placed.findIndex((token,index) => token !== target[index]);
+    reviewed=true;refreshLine();
+    /* Zdanie zostaje na miejscu. Kolory i strzałki prowadzą do samodzielnej
+       korekty, zamiast kasować dziecku całą wykonaną pracę. */
     feedback.textContent = attempts >= 2
-      ? 'Zacznij od: ' + target.slice(0,2).join(' ')
-      : (firstWrong >= 0 ? 'Pierwsze ' + (firstWrong) + ' słów jest dobrze. Dalej coś się nie zgadza.' : 'Czegoś brakuje.');
-    placed.length = 0;
-    bank.querySelectorAll('.brick').forEach(brick => brick.disabled = false);
-    refreshLine(); refreshCheck();
+      ? 'Podpowiedź: zdanie zaczyna się od „'+target.slice(0,2).join(' ')+'”. Przesuwaj czerwone klocki strzałkami. Po poprawieniu będzie można porównać brzmienie obu wersji.'
+      : 'Zielone części są ułożone dobrze. Przesuń czerwony klocek strzałką albo dotknij go, aby go wymienić. Po poprawieniu będzie można porównać brzmienie.';
+    if(attempts>=2)grammarHelp.open=true;
+    refreshCheck();
   });
 
   refreshLine();
 }
-function cssEscape(value){ return String(value).replace(/"/g,'\\"'); }
 
 /* ==================== M3: HISTORYJKI ==================== */
 
@@ -1504,7 +2205,7 @@ function renderDialogue(stage,dialogue,turnIndex){
     advanceTimer = setTimeout(()=>{ stage.textContent=''; renderDialogue(stage,dialogue,turnIndex+1); },900);
   }
 
-  if(!hasSR){
+  if(!hasSpeechRecognition){
     status.textContent = 'Mikrofon niedostępny, więc wpisz odpowiedź.';
     speak.remove();
     const input = document.createElement('input');
@@ -1759,43 +2460,155 @@ function renderOrdering(stage,item){
 
 /* ==================== EKRAN WYPRAWY ==================== */
 
+/* ==================== STATYCZNA MAPA WYPRAWY ====================
+   Mapa jest w pełni statyczna i wbudowana: rysowane w SVG uproszczone
+   zarysy lądów, bez ani jednego zapytania do sieci, więc działa offline
+   i nie wymaga w CSP żadnego obcego źródła. Kształty są celowo proste,
+   mają dać dziecku poczucie kierunku podróży, nie odwzorować geografię. */
+const LAND_SHAPES = {
+  eurasia: [[-10,36],[-9,44],[0,49],[2,51],[8,54],[12,55],[10,58],[20,60],[28,60],[30,66],[40,66],[55,68],[70,72],[90,75],[110,74],[140,72],[160,70],[170,66],[178,62],[170,60],[160,58],[145,54],[142,48],[135,44],[128,40],[122,38],[120,32],[115,24],[110,20],[108,14],[103,8],[100,6],[95,10],[92,16],[88,20],[80,12],[77,8],[72,20],[68,24],[62,24],[58,24],[55,26],[50,30],[44,38],[36,40],[30,36],[28,40],[22,40],[16,38],[10,38],[0,36],[-10,36]],
+  africa: [[-16,28],[-16,20],[-17,14],[-12,8],[-8,4],[8,4],[10,-2],[14,-10],[12,-18],[18,-28],[20,-34],[26,-34],[32,-28],[40,-16],[42,-4],[51,10],[44,12],[36,16],[34,24],[32,30],[24,32],[10,34],[-4,36],[-10,32],[-16,28]],
+  seasia: [[95,6],[100,2],[104,-2],[110,-6],[118,-8],[125,-8],[132,-4],[141,-2],[150,-6],[148,-10],[140,-9],[132,-8],[122,-8],[114,-8],[106,-6],[100,0],[96,3],[95,6]],
+  australia: [[113,-22],[114,-30],[118,-35],[124,-34],[130,-32],[137,-35],[140,-38],[146,-39],[150,-37],[153,-28],[146,-19],[142,-11],[135,-12],[130,-14],[123,-17],[116,-20],[113,-22]],
+  tasmania: [[144,-41],[148,-41],[148,-43.5],[145,-43.5],[144,-41]],
+  japan: [[130,31],[135,34],[140,37],[142,43],[140,45],[138,42],[135,35],[131,32],[130,31]]
+};
+const MAP_W = 860, MAP_H = 520, MAP_PAD = 34;
+/* Granice projekcji policzone raz z lądów, żeby cała trasa i wszystkie
+   kontynenty zawsze mieściły się w ramce niezależnie od rozmiaru ekranu. */
+const MAP_BOUNDS = (() => {
+  const all = Object.values(LAND_SHAPES).flat();
+  return {
+    minLon: Math.min(...all.map(p=>p[0])), maxLon: Math.max(...all.map(p=>p[0])),
+    minLat: Math.min(...all.map(p=>p[1])), maxLat: Math.max(...all.map(p=>p[1]))
+  };
+})();
+function mapProject(lon,lat){
+  const b = MAP_BOUNDS;
+  return {
+    x: MAP_PAD + (lon-b.minLon)/(b.maxLon-b.minLon)*(MAP_W-2*MAP_PAD),
+    y: MAP_PAD + (b.maxLat-lat)/(b.maxLat-b.minLat)*(MAP_H-2*MAP_PAD)
+  };
+}
+
+/* Wachlarz: przystanki leżące zbyt blisko siebie (Jerzykowo, Warszawa,
+   Poznań, Puszcza Zielonka nakładają się w skali świata) rozsuwamy po
+   łuku, a cienka nić łączy odsunięty znacznik z prawdziwym punktem. */
+function mapMarkerPositions(){
+  const base = JOURNEY_STOPS.map(stop => mapProject(stop.lon,stop.lat));
+  const positions = base.map(point => ({ x:point.x, y:point.y, anchorX:point.x, anchorY:point.y, fanned:false }));
+  const used = new Array(base.length).fill(false);
+  for(let i=0;i<base.length;i++){
+    if(used[i]) continue;
+    const cluster = [i]; used[i] = true;
+    for(let j=i+1;j<base.length;j++){
+      if(used[j]) continue;
+      if(Math.hypot(base[j].x-base[i].x, base[j].y-base[i].y) < 24){ cluster.push(j); used[j] = true; }
+    }
+    if(cluster.length > 1){
+      const radius = 34;
+      const spread = Math.PI*1.1;
+      const start = -Math.PI/2 - spread/2;
+      cluster.forEach((idx,order) => {
+        const angle = start + (spread*order)/(cluster.length-1);
+        positions[idx] = {
+          x: base[idx].x + Math.cos(angle)*radius,
+          y: base[idx].y + Math.sin(angle)*radius,
+          anchorX: base[idx].x, anchorY: base[idx].y, fanned: true
+        };
+      });
+    }
+  }
+  return positions;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(name,attrs){
+  const el = document.createElementNS(SVG_NS,name);
+  Object.entries(attrs||{}).forEach(([key,value]) => el.setAttribute(key,String(value)));
+  return el;
+}
+
+function drawJourneyMap(index){
+  const host = $('#journeyRouteMap');
+  host.textContent = '';
+
+  const svg = svgEl('svg',{ class:'journey-map', viewBox:'0 0 '+MAP_W+' '+MAP_H, role:'img',
+    'aria-label':'Mapa wyprawy Jerzyka, przystanek '+(index+1)+' z '+JOURNEY_STOPS.length });
+  svg.append(svgEl('rect',{ x:0, y:0, width:MAP_W, height:MAP_H, class:'map-sea' }));
+
+  Object.values(LAND_SHAPES).forEach(poly => {
+    const d = 'M' + poly.map(p => { const q = mapProject(p[0],p[1]); return q.x.toFixed(1)+','+q.y.toFixed(1); }).join(' L') + ' Z';
+    svg.append(svgEl('path',{ d, class:'map-land' }));
+  });
+
+  const stopPoints = JOURNEY_STOPS.map(stop => mapProject(stop.lon,stop.lat));
+  const routeLine = points => points.map(p => p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  svg.append(svgEl('polyline',{ class:'map-route-track', points:routeLine(stopPoints) }));
+  if(index >= 0) svg.append(svgEl('polyline',{ class:'map-route-done', points:routeLine(stopPoints.slice(0,index+1)) }));
+
+  const positions = mapMarkerPositions();
+  positions.forEach((pos,position) => {
+    if(pos.fanned){
+      svg.append(svgEl('line',{ x1:pos.anchorX, y1:pos.anchorY, x2:pos.x, y2:pos.y, class:'map-fan-thread' }));
+    }
+  });
+
+  host.append(svg);
+
+  /* Znaczniki to zwykłe przyciski nad SVG, żeby były klikalne i dostępne.
+     Pozycjonujemy je w procentach, więc skalują się z szerokością mapy. */
+  positions.forEach((pos,position) => {
+    const stop = JOURNEY_STOPS[position];
+    const reached = position <= index;
+    const marker = make('button','route-marker '+(reached?'reached':'locked')+(position===index?' current':''),String(position+1));
+    marker.type = 'button';
+    marker.style.left = (pos.x/MAP_W*100)+'%';
+    marker.style.top = (pos.y/MAP_H*100)+'%';
+    marker.setAttribute('aria-label', reached
+      ? 'Przystanek '+(position+1)+': '+stop.place+', '+stop.country+(position===index?', obecne miejsce':', odblokowany')
+      : 'Przystanek '+(position+1)+': '+stop.place+', zablokowany');
+    marker.addEventListener('click',()=>showJourneyStopHint(position));
+    host.append(marker);
+  });
+}
+
 function renderMap(){
   const index = journeyIndex();
   $('#mapLead').textContent = 'Jerzyk jest na przystanku ' + (index+1) + ' z ' + JOURNEY_STOPS.length +
     '. Każdy zdany egzamin przenosi go dalej.';
+  $('#mapHint').className='map-hint';
+  $('#mapHint').textContent='Dotknij punktu, aby zobaczyć nazwę miejsca i ciekawostkę. Zablokowane punkty pokażą, co trzeba zrobić.';
+  drawJourneyMap(index);
   const list = $('#mapList');
   list.textContent = '';
   JOURNEY_STOPS.forEach((stop,position) => {
     const reached = position <= index;
     const row = make('li','map-stop' + (reached ? ' reached' : '') + (position === index ? ' current' : ''));
-    row.append(make('span','map-number',String(position+1)));
+    row.id='mapStop-'+position;
+    const action=make(reached?'div':'button','map-stop-action');
+    if(!reached){
+      action.type='button';
+      action.setAttribute('aria-label','Sprawdź, jak odblokować przystanek '+(position+1)+': '+stop.place);
+      action.addEventListener('click',()=>showJourneyStopHint(position));
+    }
+    action.append(make('span','map-number',String(position+1)));
     const body = make('div','map-body');
-    body.append(make('strong','',reached ? stop.place + ', ' + stop.country : 'Jeszcze przed nami'));
-    if(reached) body.append(make('span','map-fact',stop.fact));
-    row.append(body);
+    body.append(make('strong','',reached ? stop.place + ', ' + stop.country : stop.place+' — zablokowany'));
+    if(reached) appendBilingualJourneyFact(body,stop);
+    else body.append(make('span','map-lock-copy','Dotknij, aby sprawdzić, co trzeba zrobić.'));
+    action.append(body);row.append(action);
     list.append(row);
   });
 
-  const badges = $('#badgeList');
-  badges.textContent = '';
-  BADGES.forEach(badge => {
-    const owned = S.badges.includes(badge.id);
-    const chip = make('button','badge-card' + (owned ? ' owned' : ''));
-    chip.type = 'button';
-    chip.append(make('span','badge-icon',owned ? (badge.icon||'🏅') : '🔒'));
-    chip.append(make('strong','',badge.name));
-    chip.append(make('span','badge-desc',badge.desc));
-    /* Zdobyte odznaki dają się otworzyć ponownie, żeby dało się wrócić
-       do historyjki później, a nie tylko w chwili zdobycia. */
-    if(owned) chip.addEventListener('click',()=>{ badgeQueue=[badge]; showNextBadge(); });
-    else chip.disabled = true;
-    badges.append(chip);
-  });
+  /* Ta sama galeria jest widoczna na stronie głównej i przy mapie.
+     Zdobyte odznaki otwierają opowieść, a zablokowane przypominają warunek. */
+  renderBadgeGallery($('#badgeList'));
 }
 
 /* ==================== PODPIĘCIA NOWYCH EKRANÓW ==================== */
 
 $('#breakContinue').addEventListener('click',()=>startStage());
 $('#breakStop').addEventListener('click',()=>finishLearning());
-$('#openMap').addEventListener('click',()=>{ renderMap(); show('map'); });
+$('#openMap').addEventListener('click',()=>{ show('map'); renderMap(); });
 $('#mapBack').addEventListener('click',()=>{ renderHome(); show('home'); });

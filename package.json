@@ -1,8 +1,8 @@
 {
   "name": "swift-bird",
-  "version": "11.1.0",
+  "version": "11.13.0",
   "private": true,
-  "description": "Szkolna aplikacja do nauki angielskich słów",
+  "description": "Szkolna aplikacja do nauki angielskich słów i budowania zdań",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

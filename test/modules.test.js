@@ -45,6 +45,161 @@ test('M2 pokrywa całą gramatykę wymaganą w klasie 4', () => {
     .forEach(required => assert.ok(ids.includes(required), 'brak wzorca: ' + required));
 });
 
+test('M2 buduje zdania tylko z poznanego słownictwa', () => {
+  const vocabulary = new Set(WORD_SECTIONS.flatMap(section => section.words.map(item => item[0].toLowerCase())));
+  PATTERNS.forEach(pattern => pattern.items.forEach((item,index) => {
+    const where=pattern.id+'#'+index;
+    assert.ok(Array.isArray(item.vocab)&&item.vocab.length,where+': brak wymagań słownikowych');
+    item.vocab.forEach(word=>assert.ok(vocabulary.has(word.toLowerCase()),where+': słowa „'+word+'” nie ma w kolekcji'));
+  }));
+
+  // Po pierwszych czterech słowach są już co najmniej trzy zadania w każdym
+  // z trzech pierwszych wzorców, więc ścieżka nie kończy się na pustym ekranie.
+  const firstFour = new Set(WORD_SECTIONS[0].words.slice(0,4).map(item=>item[0].toLowerCase()));
+  PATTERNS.slice(0,3).forEach(pattern => {
+    const available=pattern.items.filter(item=>item.vocab.every(word=>firstFour.has(word.toLowerCase())));
+    assert.ok(available.length>=3,pattern.id+': za mało zdań po otwarciu modułu');
+  });
+});
+
+test('M2 jest widocznym modułem i prowadzi przez wzorce po kolei', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  ['sentenceLaunch','openSentences','s-sentences','patternGrid','sentenceKnownN']
+    .forEach(id=>assert.ok(html.includes('id="'+id+'"'),'brak elementu M2: '+id));
+  assert.match(app,/const SENTENCE_UNLOCK_WORDS = 4;/);
+  assert.match(app,/function patternUnlocked\(index\)/);
+  assert.match(app,/learnedSentenceCount\(PATTERN_LIST\[index-1\]\.id\)>=SENTENCE_UNLOCK_SUCCESSES/);
+  assert.match(app,/function beginPatternSession\(patternId\)/);
+  assert.match(app,/if\(id === 'sentences'\) return focusedPatternQueue/);
+  assert.match(app,/function itemVocabularyReady\(item,vocabulary=collectedVocabulary\(\)\)/);
+  assert.match(app,/itemVocabularyReady\(item,vocabulary\)/);
+});
+
+test('M1 jest osobnym modułem, a lista sekcji otwiera się dopiero po kliknięciu', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  ['vocabularyLaunch','vocabularyLaunchText','vocabularyLaunchFill','openVocabulary','s-vocabulary','vocabularyBack','vocabularyCollectedN','sectionsGrid']
+    .forEach(id=>assert.ok(html.includes('id="'+id+'"'),'brak elementu M1: '+id));
+  const home=html.slice(html.indexOf('id="s-home"'),html.indexOf('id="s-vocabulary"'));
+  const vocabulary=html.slice(html.indexOf('id="s-vocabulary"'),html.indexOf('id="s-sentences"'));
+  assert.ok(!home.includes('id="sectionsGrid"'),'lista sekcji nadal jest rozwinięta na stronie głównej');
+  assert.ok(vocabulary.includes('id="sectionsGrid"'),'lista sekcji nie trafiła do modułu słówek');
+  assert.match(app,/function renderVocabularyHub\(\)/);
+  assert.match(app,/\$\('#openVocabulary'\)\.addEventListener\('click',renderVocabularyHub\)/);
+  assert.match(app,/\$\('#sectionBack'\)\.addEventListener\('click',renderVocabularyHub\)/);
+});
+
+test('M2 zachowuje zdanie po błędzie i wskazuje klocek do przesunięcia', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const start=app.indexOf('function sentenceMatchMarks(');
+  assert.notEqual(start,-1,'brak algorytmu oznaczania fragmentów zdania');
+  let depth=0,index=app.indexOf('{',start);
+  for(;index<app.length;index++){
+    if(app[index]==='{')depth++;
+    else if(app[index]==='}'){depth--;if(depth===0)break;}
+  }
+  const marks=new Function(app.slice(start,index+1)+'\nreturn sentenceMatchMarks;')();
+  assert.deepEqual(marks(['I','am','happy'],['I','am','happy']),[true,true,true]);
+  assert.deepEqual(marks(['wrong','I','am'],['I','am','happy']),[false,true,true]);
+  assert.deepEqual(marks(['I','happy','am'],['I','am','happy']),[true,false,true]);
+
+  const pattern=app.slice(app.indexOf('function renderPattern('),app.indexOf('function renderStory('));
+  assert.match(pattern,/brick-move/);
+  assert.match(pattern,/reviewed=true;refreshLine\(\)/);
+  assert.doesNotMatch(pattern,/placed\.length\s*=\s*0/,'błędne zdanie nie może być kasowane');
+  assert.match(pattern,/Zielone części są ułożone dobrze/);
+});
+
+test('M2 wymaga przeczytania zdania i czeka na decyzję dziecka', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const pattern=app.slice(app.indexOf('function renderPattern('),app.indexOf('function renderStory('));
+  assert.match(pattern,/speakSentence\(sentenceText,enableReading\)/,'brak naturalnego wzoru zdania');
+  assert.match(pattern,/listen\(sentenceText[\s\S]*sentencePronunciationMatches\)/,'brak oceny całego zdania');
+  assert.match(pattern,/Przeczytaj zdanie na głos/);
+  assert.match(pattern,/Posłuchaj jeszcze raz/);
+  assert.match(pattern,/Następne zdanie/);
+  assert.match(pattern,/Pomiń czytanie zdania/,'admin musi móc sprawdzić ścieżkę bez mikrofonu');
+  assert.doesNotMatch(pattern,/setTimeout\(nextStep/,'zadanie nie może przechodzić samo do kolejnego zdania');
+});
+
+test('M2 wymaga dokładnego przepisania zdania przed włączeniem lektora i mikrofonu', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const start=app.indexOf('function sentenceSpellingMatches(');
+  assert.notEqual(start,-1,'brak osobnej kontroli pisowni zdania');
+  let depth=0,index=app.indexOf('{',start);
+  for(;index<app.length;index++){
+    if(app[index]==='{')depth++;
+    else if(app[index]==='}'){depth--;if(depth===0)break;}
+  }
+  const matches=new Function(app.slice(start,index+1)+'\nreturn sentenceSpellingMatches;')();
+  assert.equal(matches('This is a cat.','This is a cat.'),true);
+  assert.equal(matches('  This is a cat.  ','This is a cat.'),true,'zewnętrzne spacje nie powinny blokować dziecka');
+  assert.equal(matches('this is a cat.','This is a cat.'),false,'wielka litera jest obowiązkowa');
+  assert.equal(matches('This is a cat','This is a cat.'),false,'znak końcowy jest obowiązkowy');
+  assert.equal(matches('This  is a cat.','This is a cat.'),false,'odstępy wewnątrz zdania są sprawdzane');
+
+  const pattern=app.slice(app.indexOf('function renderPattern('),app.indexOf('function renderStory('));
+  assert.match(pattern,/Teraz przepisz całe zdanie/);
+  assert.match(pattern,/Sprawdź pisownię/);
+  assert.match(pattern,/noteMistake\('sentence-spelling',item\.id\)/);
+  assert.match(pattern,/copyPanel\.hidden=false;[\s\S]*copyInput\.focus\(\)/);
+  assert.match(pattern,/function acceptSpelling\(\)[\s\S]*speechPanel\.hidden=false;[\s\S]*playSentenceModel\(\)/,
+    'lektor może ruszyć dopiero po poprawnym przepisaniu');
+  assert.match(pattern,/if\(completed\|\|!spellingReady\)return;/,'zaliczenie nie może ominąć pisowni');
+  assert.match(pattern,/const flawless=attempts===0&&copyAttempts===0/,'błąd pisowni musi odebrać wynik bezbłędny');
+  assert.match(pattern,/Pomiń przepisywanie zdania/,'admin potrzebuje pełnej ścieżki testowej');
+});
+
+test('M2 porównuje błędne brzmienie dopiero po samodzielnej korekcie', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const pattern=app.slice(app.indexOf('function renderPattern('),app.indexOf('function renderStory('));
+  assert.match(pattern,/lastIncorrectSentence=sentenceTextFromTokens/,'brak zapisu wcześniejszej próby');
+  assert.match(pattern,/Porównaj: błędne → poprawne/);
+  assert.match(pattern,/if\(lastIncorrectSentence\)[\s\S]*contrastBox\.hidden=false/,
+    'porównanie powinno pojawić się dopiero po poprawieniu układu');
+  const comparison=pattern.slice(pattern.indexOf("contrastButton.addEventListener('click'"),pattern.indexOf("replayButton.addEventListener('click'"));
+  const wrongAt=comparison.indexOf('speakSentence(lastIncorrectSentence');
+  const correctAt=comparison.indexOf('speakSentence(sentenceText');
+  assert.ok(wrongAt!==-1&&correctAt>wrongAt,'prawidłowa wersja musi być czytana jako ostatnia');
+  const errorStart=pattern.lastIndexOf('attempts++;');
+  const errorFlow=pattern.slice(errorStart);
+  assert.doesNotMatch(errorFlow,/speakSentence\(lastIncorrectSentence/,
+    'błędna odpowiedź nie może zostać odtworzona automatycznie');
+});
+
+test('M2 ma pomoc gramatyczną dla każdego wzorca i dobre nawyki', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const start=app.indexOf('const GRAMMAR_TERMS=');
+  const end=app.indexOf('const BADGES = [');
+  assert.ok(start!==-1&&end>start,'brak danych pomocy gramatycznej');
+  const grammar=new Function(app.slice(start,end)+'\nreturn {GRAMMAR_TERMS,GRAMMAR_GUIDES};')();
+  PATTERNS.forEach(pattern=>assert.ok(grammar.GRAMMAR_GUIDES[pattern.id],pattern.id+': brak podpowiedzi'));
+  ['noun','pronoun','verb','adjective','preposition','question']
+    .forEach(term=>assert.ok(grammar.GRAMMAR_TERMS[term],term+': brak definicji'));
+  const helper=app.slice(app.indexOf('function grammarSpeechText('),app.indexOf('function renderPattern('));
+  assert.match(helper,/Potrzebuję podpowiedzi/);
+  assert.match(helper,/wielką literą/);
+  assert.match(helper,/znakiem zapytania/);
+  assert.match(helper,/appendGrammarBricks/,'angielskie przykłady powinny być osobnymi klockami');
+  assert.match(helper,/make\('button','grammar-brick grammar-audio'/,'klocki podpowiedzi powinny być przyciskami');
+  assert.match(helper,/brick\.addEventListener\('click',\(\)=>say\(spoken\)\)/,'każdy klocek powinien odtwarzać własną wymowę');
+  assert.match(helper,/Odtwórz po angielsku:/,'przycisk odsłuchu potrzebuje dostępnej etykiety');
+  const speechStart=helper.indexOf('function grammarSpeechText(');
+  const speechEnd=helper.indexOf('\nfunction appendGrammarBricks(',speechStart);
+  const grammarSpeechText=new Function(helper.slice(speechStart,speechEnd)+'\nreturn grammarSpeechText;')();
+  assert.equal(grammarSpeechText('?'),'question mark');
+  assert.equal(grammarSpeechText('.'),'full stop');
+  assert.equal(grammarSpeechText('-ing'),'ing ending');
+  assert.equal(grammarSpeechText('cat'),'cat');
+  const styles=fs.readFileSync(path.join(root,'styles.css'),'utf8');
+  assert.match(styles,/\.grammar-brick\{/);
+  assert.match(styles,/\.grammar-audio-icon\{/);
+  assert.equal(grammar.GRAMMAR_TERMS.noun.english,'noun');
+  assert.deepEqual(grammar.GRAMMAR_TERMS.adjective.examples,['happy','tall','blue','small']);
+  assert.match(app,/if\(attempts>=2\)grammarHelp\.open=true/);
+});
+
 test('M3: historyjki mają pytanie o główną myśl i pytania o szczegół', () => {
   STORIES.forEach(story => {
     assert.ok(story.text.length >= 6, story.id + ': za krótka');
@@ -86,6 +241,12 @@ test('M4: odpowiedź wzorcowa przechodzi własne kryteria', () => {
   });
 });
 
+test('M4 korzysta z istniejącego wykrywania mikrofonu', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  assert.match(app,/if\(!hasSpeechRecognition\)/);
+  assert.doesNotMatch(app,/\bhasSR\b/);
+});
+
 test('M5: bank błędów jest spójny, a układanki są prawidłowymi permutacjami', () => {
   ERROR_BANK.forEach(item => {
     assert.ok(item.wrong[item.bad], item.id + ': zły indeks błędu');
@@ -109,10 +270,12 @@ test('wyprawa ma po jednym przystanku na sekcję i eksportuje się do przegląda
   assert.deepEqual(JOURNEY.map(stop => stop.section), WORD_SECTIONS.map(section => section.id));
   JOURNEY.forEach(stop => {
     assert.ok(stop.fact && stop.fact.length > 20, stop.place + ': brak faktu');
+    assert.ok(stop.factEn && stop.factEn.length > 20, stop.place + ': brak angielskiej wersji faktu');
     assert.equal(typeof stop.lat, 'number');
     assert.equal(typeof stop.lon, 'number');
   });
   assert.equal(JOURNEY[0].place, 'Jerzykowo');
+  assert.equal(JOURNEY[1].place, 'Warszawa');
   // Bez tego eksportu mapa i ekrany przerw byłyby w przeglądarce puste.
   const source = fs.readFileSync(path.join(root, 'journey.js'), 'utf8');
   assert.match(source, /window\.JOURNEY = JOURNEY/);
@@ -121,14 +284,64 @@ test('wyprawa ma po jednym przystanku na sekcję i eksportuje się do przegląda
   });
 });
 
+test('wyprawa ma statyczną, wbudowaną mapę SVG bez połączeń sieciowych', () => {
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+
+  assert.match(html, /id="journeyRouteMap"/);
+
+  // Mapa jest rysowana w SVG z wbudowanych kształtów, nie z kafelków.
+  assert.match(app, /const LAND_SHAPES = \{/, 'brak wbudowanych zarysów lądów');
+  assert.match(app, /function drawJourneyMap\(index\)/);
+  assert.match(app, /svgEl\('path'/, 'lądy muszą być rysowane jako ścieżki SVG');
+
+  // Żadnego obcego serwera map: ani w kodzie, ani w CSP.
+  assert.doesNotMatch(app, /tile\.openstreetmap|https?:\/\/[^'"]*tile/, 'mapa nie może pobierać kafelków z sieci');
+  assert.doesNotMatch(server, /tile\.openstreetmap/, 'CSP nie może dopuszczać obcego serwera kafelków');
+  assert.match(server, /img-src 'self' data:;/, 'CSP obrazów powinno być zawężone do self i data');
+
+  // Nakładające się przystanki (1-4) rozsuwamy wachlarzem z nicią do punktu.
+  assert.match(app, /function mapMarkerPositions\(\)/);
+  assert.match(app, /map-fan-thread/, 'zbite punkty muszą mieć nić do prawdziwego miejsca');
+  // Budujemy mapMarkerPositions z jego zależnościami: kształty, wymiary,
+  // granice projekcji i sama funkcja projekcji.
+  const slice = (from, to) => app.slice(app.indexOf(from), app.indexOf(to));
+  const positions = new Function('JOURNEY_STOPS',
+    slice('const LAND_SHAPES =', 'const SVG_NS =') +
+    '\nreturn mapMarkerPositions();')(JOURNEY);
+  assert.equal(positions.length, JOURNEY.length);
+  const fanned = positions.filter(p => p.fanned).length;
+  assert.ok(fanned >= 4, 'co najmniej pierwsze cztery przystanki powinny być rozsunięte, było ' + fanned);
+  // Rozsunięte znaczniki nie mogą już leżeć na sobie.
+  const fannedPts = positions.filter(p => p.fanned);
+  for(let i = 0; i < fannedPts.length; i++){
+    for(let j = i + 1; j < fannedPts.length; j++){
+      const dist = Math.hypot(fannedPts[i].x - fannedPts[j].x, fannedPts[i].y - fannedPts[j].y);
+      assert.ok(dist > 12, 'rozsunięte znaczniki wciąż się nakładają: ' + dist.toFixed(1));
+    }
+  }
+
+  // Punkty są klikalne i odsłaniają nazwę oraz stan.
+  assert.match(app, /marker\.addEventListener\('click',\(\)=>showJourneyStopHint\(position\)\)/,
+    'punkty mapy muszą reagować na dotknięcie');
+  assert.match(app, /'aria-label', reached/, 'znacznik potrzebuje etykiety dostępności');
+
+  // Mapa jest nieruchoma: bez zoomu, przeciągania i przerysowań przy resize.
+  assert.doesNotMatch(app, /journey-map-controls|Powiększ mapę|pointerdown|addEventListener\('resize'/,
+    'mapa ma pozostać statyczna');
+});
+
 test('wszystkie pliki modułów są serwowane i trafiają do pamięci offline', () => {
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const worker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const dockerfile = fs.readFileSync(path.join(root, 'Dockerfile'), 'utf8');
   ['patterns.js', 'stories.js', 'dialogues.js', 'errors.js', 'journey.js'].forEach(file => {
     assert.ok(server.includes("'/" + file + "'"), 'serwer nie wystawia ' + file);
     assert.ok(worker.includes("'./" + file + "'"), 'brak w pamięci offline: ' + file);
     assert.ok(html.includes('src="./' + file + '"'), 'brak w HTML: ' + file);
+    assert.ok(dockerfile.includes(file), 'Docker pomija ' + file);
   });
 });
 
@@ -190,6 +403,7 @@ test('każda odznaka ma ikonę, nagrodę i historyjkę do przeczytania', () => {
     assert.ok(badge.icon, badge.id + ': brak ikony');
     assert.ok(badge.reward, badge.id + ': brak opisu nagrody');
     assert.ok(badge.story && badge.story.split(' ').length >= 30, badge.id + ': historyjka za krótka');
+    assert.ok(badge.storyEn && badge.storyEn.split(' ').length >= 30, badge.id + ': brak angielskiej historyjki');
   });
   // Okno, nie znikający napis: zdobycie odznaki ma być momentem.
   assert.match(app, /function showNextBadge\(\)/);
@@ -197,6 +411,25 @@ test('każda odznaka ma ikonę, nagrodę i historyjkę do przeczytania', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   ['badgeModal', 'badgeStory', 'badgeStoryButton', 'badgeRewardButton', 'badgeClose', 'badgeQueueNote']
     .forEach(id => assert.ok(html.includes('id="' + id + '"'), 'brak elementu ' + id));
+  ['badgeN','homeBadgeCount','homeBadgeList','badgeList']
+    .forEach(id=>assert.ok(html.includes('id="'+id+'"'),'odznaki nie są widoczne w interfejsie: '+id));
+  assert.match(app,/function renderBadgeGallery\(host\)/,'brak wspólnej galerii odznak');
+  assert.match(app,/renderBadgeGallery\(\$\('#homeBadgeList'\)\)/,'galeria odznak nie jest renderowana na stronie głównej');
+  assert.match(app,/const restoredBadges=checkBadges\(\)/,'wcześniejsze osiągnięcia nie są odzyskiwane po logowaniu');
+  assert.match(app,/Warunek odznaki/,'zablokowana odznaka powinna wyjaśniać warunek');
+  assert.match(app,/speakSentence\(badge\.storyEn\)/,'angielska historyjka odznaki nie ma lektora');
+});
+
+test('opowieść o jerzyku jest dwujęzyczna i ma angielskiego lektora', () => {
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const helper=app.slice(app.indexOf('function appendBilingualJourneyFact('),app.indexOf('function renderStageBreak('));
+  assert.match(helper,/Polski/);
+  assert.match(helper,/English/);
+  assert.match(helper,/stop\.factEn/);
+  assert.match(helper,/speakSentence\(stop\.factEn\)/);
+  assert.match(app,/appendBilingualJourneyFact\(host,stop\)/);
+  assert.match(app,/appendBilingualJourneyFact\(complete,stop\)/);
+  assert.match(app,/appendBilingualJourneyFact\(body,stop\)/);
 });
 
 test('warunek odznaki detektywa jest osiągalny', () => {

@@ -93,9 +93,13 @@ function loadSpeechHelpers(){
   };
   const blocked = source.match(/const BLOCKED_WORDS=new Set\(\[[^\]]*\]\);/);
   assert.ok(blocked, 'brak listy zablokowanych słów');
+  const equivalents = source.match(/const SPEECH_EQUIVALENTS=Object\.freeze\(\{[\s\S]*?\}\);/);
+  assert.ok(equivalents, 'brak bezpiecznych odpowiedników fonetycznych');
+  const optionalSentenceWords = source.match(/const OPTIONAL_SENTENCE_WORDS=new Set\(\[[^\]]*\]\);/);
+  assert.ok(optionalSentenceWords, 'brak listy opcjonalnych rodzajników w zdaniu');
   const factory = new Function(
-    blocked[0] + '\n' + pick('normalizeSpeech') + '\n' + pick('containsBlockedWord') + '\n' + pick('pronunciationMatches') +
-    '\nreturn {normalizeSpeech, containsBlockedWord, pronunciationMatches};'
+    blocked[0] + '\n' + equivalents[0] + '\n' + optionalSentenceWords[0] + '\n' + pick('normalizeSpeech') + '\n' + pick('containsBlockedWord') + '\n' + pick('speechKey') + '\n' + pick('pronunciationMatches') + '\n' + pick('sentenceSpeechTokens') + '\n' + pick('sentencePronunciationMatches') +
+    '\nreturn {normalizeSpeech, containsBlockedWord, pronunciationMatches, sentencePronunciationMatches};'
   );
   return factory();
 }
@@ -108,8 +112,26 @@ test('zgodność wymowy nie zależy już od pewności rozpoznania', () => {
   assert.equal(pronunciationMatches('Duck.', 'duck'), true);
   assert.equal(pronunciationMatches(' DUCK ', 'duck'), true);
   assert.equal(pronunciationMatches('ice cream', 'ice cream'), true);
+  assert.equal(pronunciationMatches('B', 'bee'), true);
+  assert.equal(pronunciationMatches('be', 'bee'), true);
+  assert.equal(pronunciationMatches('the letter B', 'bee'), true);
+  assert.equal(pronunciationMatches('a bee', 'bee'), true);
+  assert.equal(pronunciationMatches('see', 'sea'), true);
+  assert.equal(pronunciationMatches('flour', 'flower'), true);
+  assert.equal(pronunciationMatches('bees', 'bee'), false);
   assert.equal(pronunciationMatches('dog', 'duck'), false);
   assert.equal(pronunciationMatches('', 'duck'), false);
+});
+
+test('całe zdanie toleruje zapis rozpoznawania, ale nie inną treść', () => {
+  const {sentencePronunciationMatches} = loadSpeechHelpers();
+  assert.equal(sentencePronunciationMatches("I'm happy", 'I am happy.'), true);
+  assert.equal(sentencePronunciationMatches("She's got a dog", 'She has got a dog.'), true);
+  assert.equal(sentencePronunciationMatches('I have got cat', 'I have got a cat.'), true,
+    'mikrofon może zgubić cichy rodzajnik');
+  assert.equal(sentencePronunciationMatches('I have got a dog', 'I have got a cat.'), false);
+  assert.equal(sentencePronunciationMatches('Happy I am', 'I am happy.'), false);
+  assert.equal(sentencePronunciationMatches('', 'I am happy.'), false);
 });
 
 test('wulgaryzmy z rozpoznawania są wyłapywane', () => {

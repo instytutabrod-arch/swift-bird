@@ -1,7 +1,7 @@
 {
   "name": "Swift-bird",
   "short_name": "Swift-bird",
-  "description": "Szkolna nauka 500 angielskich słów z wymową, pisownią i egzaminami.",
+  "description": "Szkolna nauka angielskich słów, budowania zdań, wymowy i pisowni.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

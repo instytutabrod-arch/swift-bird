@@ -105,7 +105,7 @@ function clearSessionCookie(){return SESSION_COOKIE+'=; Path=/; HttpOnly; SameSi
 
 function securityHeaders(contentType){
   const headers={
-    'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',
+    'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','X-Frame-Options':'DENY',
     'Permissions-Policy':'camera=(), geolocation=(), microphone=(self)',
     'Content-Security-Policy':"default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
   };
@@ -344,7 +344,8 @@ async function handleApi(request,response,pathname){
     const result=await pool.query(`SELECT st.id,st.first_name,st.last_initial,st.created_at,st.last_active,COALESCE(pr.state,'{}'::jsonb) AS state,pr.updated_at FROM students st LEFT JOIN student_progress pr ON pr.student_id=st.id WHERE st.active=TRUE ORDER BY st.first_name_normalized,st.last_initial,st.created_at`);
     const students=result.rows.map(row=>{
       const state=sanitizeProgress(row.state);const words=Math.min(500,Object.keys(state.cards).length);const exams=state.passedExams.length;
-      return {id:row.id,displayName:row.first_name+' '+row.last_initial+'.',wordsCollected:words,examsPassed:exams,currentSection:Math.min(25,exams+1),lastActive:row.last_active||row.updated_at||row.created_at};
+      const sentences=Math.min(70,Object.values(state.patterns).filter(item=>item&&item.ok>0).length);
+      return {id:row.id,displayName:row.first_name+' '+row.last_initial+'.',wordsCollected:words,sentencesCompleted:sentences,examsPassed:exams,currentSection:Math.min(25,exams+1),lastActive:row.last_active||row.updated_at||row.created_at};
     });
     return json(response,200,{students});
   }

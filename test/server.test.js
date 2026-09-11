@@ -31,6 +31,8 @@ test('pełny przepływ API: administrator, konto ucznia i postęp', async () => 
   const post=(path,body,cookie)=>fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},body:JSON.stringify(body)});
   try{
     const health=await fetch(base+'/api/health');assert.equal(health.status,200);
+    assert.equal(health.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
+    assert.match(health.headers.get('content-security-policy'),/img-src 'self' data:;/);
 
     const adminLogin=await post('/api/admin/login',{password:'bezpieczne-haslo-testowe'});
     assert.equal(adminLogin.status,200);const adminCookie=adminLogin.headers.get('set-cookie').split(';')[0];
@@ -42,13 +44,13 @@ test('pełny przepływ API: administrator, konto ucznia i postęp', async () => 
     const studentLogin=await post('/api/student/login',{firstName:'maja',lastInitial:'k',pin:created.pin});
     assert.equal(studentLogin.status,200);const studentCookie=studentLogin.headers.get('set-cookie').split(';')[0];
 
-    const saved=await fetch(base+'/api/progress',{method:'PUT',headers:{'Content-Type':'application/json',Cookie:studentCookie},body:JSON.stringify({state:{cards:{'animals-home:cat':{i:1,e:2.2,d:1,r:1,ok:1,bad:0}},passedExams:[]}})});
+    const saved=await fetch(base+'/api/progress',{method:'PUT',headers:{'Content-Type':'application/json',Cookie:studentCookie},body:JSON.stringify({state:{cards:{'animals-home:cat':{i:1,e:2.2,d:1,r:1,ok:1,bad:0}},patterns:{'to-be-positive#0':{i:1,e:2.2,d:1,r:1,ok:1,bad:0}},passedExams:[]}})});
     assert.equal(saved.status,200);
     const progress=await fetch(base+'/api/progress',{headers:{Cookie:studentCookie}});assert.equal(progress.status,200);
     assert.ok((await progress.json()).state.cards['animals-home:cat']);
 
     const list=await fetch(base+'/api/admin/students',{headers:{Cookie:adminCookie}});assert.equal(list.status,200);
-    const students=(await list.json()).students;assert.equal(students.length,1);assert.equal(students[0].displayName,'Maja K.');assert.equal(students[0].wordsCollected,1);
+    const students=(await list.json()).students;assert.equal(students.length,1);assert.equal(students[0].displayName,'Maja K.');assert.equal(students[0].wordsCollected,1);assert.equal(students[0].sentencesCompleted,1);
 
     const reset=await post('/api/admin/students/'+created.id+'/reset-pin',{},adminCookie);
     assert.equal(reset.status,200);const newPin=(await reset.json()).student.pin;assert.match(newPin,/^\d{4}$/);
