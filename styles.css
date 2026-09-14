@@ -368,3 +368,23 @@ input:focus{border-color:var(--ink-soft)}
 .track-option input:checked + .track-card{border-color:var(--yellow);background:#22437a}
 .track-option input:focus-visible + .track-card{outline:3px solid var(--yellow);outline-offset:2px}
 body.track-world .track-school-only{display:none}
+
+/* ==================== PULE SŁÓWEK ==================== */
+.pool-create{background:#1a3564;border-radius:16px;padding:16px;margin-bottom:22px;display:flex;flex-direction:column;gap:10px}
+.pool-create label{display:flex;flex-direction:column;gap:5px;font-size:.85rem;color:var(--muted)}
+.pool-create input,.pool-create textarea{background:var(--paper);color:var(--ink);border:0;border-radius:10px;padding:11px 13px;font-family:var(--body);font-size:1rem}
+.pool-create textarea{resize:vertical;min-height:120px;line-height:1.5}
+.pool-preview{background:var(--ink-deep);border-radius:12px;padding:12px 14px;font-size:.9rem}
+.pool-preview-count{font-weight:600;color:var(--green);margin:0 0 8px}
+.pool-preview-empty{color:var(--pink);margin:0}
+.pool-preview-words{display:flex;flex-wrap:wrap;gap:6px}
+.pool-chip{background:#22437a;border-radius:8px;padding:5px 9px;font-size:.85rem;display:inline-flex;align-items:center;gap:5px}
+.pool-chip-icon{font-size:1.05rem}
+.pool-preview-rejected{margin-top:10px;padding-top:10px;border-top:1px solid #2f4f85;color:var(--muted);font-size:.82rem}
+.pool-reject-line{margin:2px 0;color:var(--pink)}
+.pools-list{display:flex;flex-direction:column;gap:9px}
+.pool-card{background:#1a3564;border-radius:12px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pool-card-info{display:flex;flex-direction:column;gap:3px}
+.pool-card-meta{font-size:.8rem;color:var(--muted)}
+.pool-delete{background:transparent;border:1px solid #6b1a30;color:#ff9db5;border-radius:8px;padding:7px 13px;font-size:.85rem;cursor:pointer}
+.pool-delete:active{background:#3a1420}

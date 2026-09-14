@@ -17,7 +17,7 @@ test('schemat PostgreSQL tworzy wszystkie tabele aplikacji', async () => {
   const database=new adapter.Pool();
   await initializeDatabase(database);
   const result=await database.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name");
-  assert.deepEqual(result.rows.map(row=>row.table_name),['sessions','student_progress','students']);
+  assert.deepEqual(result.rows.map(row=>row.table_name),['pool_words','sessions','student_progress','students','word_pools']);
   await database.end();
 });
 

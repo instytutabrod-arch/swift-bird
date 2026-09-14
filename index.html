@@ -52,7 +52,7 @@
       </form>
       <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
       <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
-      <p class="version-label">Wersja 11.17</p>
+      <p class="version-label">Wersja 11.18</p>
     </div>
   </section>
 
@@ -107,7 +107,7 @@
         <p id="adminLoginError" class="form-error" role="alert"></p>
         <button class="primary" type="submit">Zaloguj się</button>
       </form>
-      <p class="version-label">Wersja 11.17</p>
+      <p class="version-label">Wersja 11.18</p>
     </div>
   </section>
 
@@ -134,6 +134,7 @@
       </section>
       <section class="home-actions">
         <button id="openMap" class="secondary wide track-school-only" type="button">🗺️ Mapa wyprawy Jerzyka</button>
+        <button id="openPools" class="secondary wide" type="button">📚 Moje pule słówek</button>
         <button id="trackToggle" class="text-button" type="button">Przełącz na Świat</button>
         <p class="journey-home-copy">Każdy zdany egzamin przesuwa Jerzyka do kolejnego miejsca. Piórka zdobywasz za trudne, dobrze wykonane zadania.</p>
         <p id="challengeLine" class="done-challenge"></p>
@@ -247,6 +248,26 @@
     </main>
   </section>
 
+  <section id="s-pools" class="screen app-screen">
+    <header class="simple-header"><button id="poolsBack" class="back-button" type="button">← Wróć</button><span>Pule słówek</span></header>
+    <main class="content narrow">
+      <p class="lead">Twoje własne zestawy słówek. Wklej listę, po jednym słowie w linii, w formacie: <strong>słowo - tłumaczenie</strong>.</p>
+      <section class="pool-create">
+        <label>Nazwa puli<input id="poolName" type="text" maxlength="60" placeholder="np. Lekcja 5, Biznes"></label>
+        <label>Wklej listę słówek
+          <textarea id="poolList" rows="7" placeholder="dog - pies&#10;business - biznes&#10;invoice - faktura"></textarea>
+        </label>
+        <button id="poolPreview" class="secondary" type="button">Sprawdź listę</button>
+        <div id="poolPreviewBox" class="pool-preview" hidden></div>
+        <p id="poolError" class="form-error" role="alert"></p>
+        <button id="poolCreate" class="primary wide" type="button" disabled>Utwórz pulę</button>
+      </section>
+      <h2 class="map-heading">Twoje pule</h2>
+      <div id="poolsList" class="pools-list"></div>
+      <p id="poolsEmpty" class="fine-print" hidden>Nie masz jeszcze żadnej puli. Wklej listę powyżej, aby zacząć.</p>
+    </main>
+  </section>
+
   <section id="s-map" class="screen app-screen">
     <header class="simple-header"><button id="mapBack" class="back-button" type="button">← Wróć</button><span>Wyprawa Jerzyka</span></header>
     <main class="content">
@@ -334,6 +355,7 @@
   <script src="./words.js"></script>
   <script src="./patterns.js"></script>
   <script src="./sentence-gen.js"></script>
+  <script src="./pool-parser.js"></script>
   <script src="./stories.js"></script>
   <script src="./dialogues.js"></script>
   <script src="./errors.js"></script>

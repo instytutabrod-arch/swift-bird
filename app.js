@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '11.17';
+const APP_VERSION = '11.18';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -2853,3 +2853,100 @@ $('#breakContinue').addEventListener('click',()=>startStage());
 $('#breakStop').addEventListener('click',()=>finishLearning());
 $('#openMap').addEventListener('click',()=>{ show('map'); renderMap(); });
 $('#mapBack').addEventListener('click',()=>{ renderHome(); show('home'); });
+
+/* ==================== PULE SŁÓWEK ==================== */
+
+/* Podgląd parsuje listę tym samym parserem co serwer, więc uczeń widzi
+   dokładnie to, co zostanie zapisane, wraz z liniami do poprawy. */
+function renderPoolPreview(){
+  const box=$('#poolPreviewBox');
+  const text=$('#poolList').value;
+  if(!window.POOL_PARSER){ box.hidden=true; return; }
+  const parsed=window.POOL_PARSER.parseWordList(text);
+  box.hidden=false;
+  box.textContent='';
+  if(!parsed.entries.length){
+    box.append(make('p','pool-preview-empty','Nie rozpoznano żadnego słowa. Sprawdź format: słowo - tłumaczenie.'));
+    $('#poolCreate').disabled=true;
+    return;
+  }
+  const world=currentTrack()==='world';
+  box.append(make('p','pool-preview-count','Rozpoznano '+parsed.entries.length+' słów.'));
+  const list=make('div','pool-preview-words');
+  parsed.entries.slice(0,40).forEach(entry=>{
+    const chip=make('span','pool-chip');
+    if(!world){ const ic=window.POOL_PARSER.guessIcon(entry.en); chip.append(make('span','pool-chip-icon',ic)); }
+    chip.append(make('span','',entry.en+' → '+entry.pl));
+    list.append(chip);
+  });
+  box.append(list);
+  if(parsed.entries.length>40) box.append(make('p','fine-print','…i '+(parsed.entries.length-40)+' więcej.'));
+  if(parsed.rejected.length){
+    const warn=make('div','pool-preview-rejected');
+    warn.append(make('p','','Pominięto '+parsed.rejected.length+' linii:'));
+    parsed.rejected.slice(0,5).forEach(r=>warn.append(make('p','pool-reject-line','linia '+r.line+': '+r.reason)));
+    box.append(warn);
+  }
+  $('#poolCreate').disabled=false;
+}
+
+async function loadPools(){
+  const listBox=$('#poolsList'), empty=$('#poolsEmpty');
+  listBox.textContent='';
+  try{
+    const data=await api('/api/pools');
+    const pools=data.pools||[];
+    empty.hidden=pools.length>0;
+    pools.forEach(poolItem=>{
+      const card=make('div','pool-card');
+      const info=make('div','pool-card-info');
+      info.append(make('strong','',poolItem.name));
+      info.append(make('span','pool-card-meta',poolItem.words+' słów'+(poolItem.createdBy==='teacher'?' · od nauczyciela':'')));
+      card.append(info);
+      const del=make('button','pool-delete','Usuń');
+      del.type='button';
+      del.addEventListener('click',async ()=>{
+        if(!confirm('Usunąć pulę „'+poolItem.name+'”?'))return;
+        try{ await api('/api/pools/'+poolItem.id,{method:'DELETE'}); loadPools(); }
+        catch(problem){ toast('Nie udało się usunąć.'); }
+      });
+      card.append(del);
+      listBox.append(card);
+    });
+  }catch(problem){ empty.hidden=false; empty.textContent='Nie udało się wczytać pul.'; }
+}
+
+function openPools(){
+  $('#poolName').value=''; $('#poolList').value='';
+  $('#poolPreviewBox').hidden=true; $('#poolError').textContent='';
+  $('#poolCreate').disabled=true;
+  loadPools();
+  show('pools');
+}
+
+const poolPreviewButton=$('#poolPreview');
+if(poolPreviewButton) poolPreviewButton.addEventListener('click',renderPoolPreview);
+const openPoolsButton=$('#openPools');
+if(openPoolsButton) openPoolsButton.addEventListener('click',openPools);
+const poolsBackButton=$('#poolsBack');
+if(poolsBackButton) poolsBackButton.addEventListener('click',()=>{ renderHome(); show('home'); });
+
+const poolCreateButton=$('#poolCreate');
+if(poolCreateButton) poolCreateButton.addEventListener('click',async ()=>{
+  const error=$('#poolError'); error.textContent='';
+  const name=$('#poolName').value.trim();
+  if(!name){ error.textContent='Podaj nazwę puli.'; $('#poolName').focus(); return; }
+  if(inTestMode()){ toast('W trybie testowym pule nie są zapisywane.'); return; }
+  poolCreateButton.disabled=true;
+  try{
+    const result=await api('/api/pools',{method:'POST',body:{
+      name, track:currentTrack(), list:$('#poolList').value
+    }});
+    let message='Utworzono pulę „'+name+'” z '+result.pool.words+' słowami.';
+    if(result.rejected && result.rejected.length) message+=' Pominięto '+result.rejected.length+' linii.';
+    toast(message);
+    $('#poolName').value=''; $('#poolList').value=''; $('#poolPreviewBox').hidden=true;
+    loadPools();
+  }catch(problem){ error.textContent=problem.message||'Nie udało się utworzyć puli.'; }
+  finally{ poolCreateButton.disabled=false; }
+});

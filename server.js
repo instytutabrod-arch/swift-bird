@@ -3,6 +3,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseWordList, guessIcon } = require('./pool-parser');
 const crypto = require('node:crypto');
 const {promisify} = require('node:util');
 const {Pool} = require('pg');
@@ -56,6 +57,24 @@ async function initializeDatabase(database=pool){
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
+    -- Pule słówek: nazwane zestawy, każdy należy do konta ucznia.
+    CREATE TABLE IF NOT EXISTS word_pools (
+      id UUID PRIMARY KEY,
+      student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      created_by TEXT NOT NULL DEFAULT 'student',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS word_pools_student_idx ON word_pools(student_id);
+    CREATE TABLE IF NOT EXISTS pool_words (
+      id UUID PRIMARY KEY,
+      pool_id UUID NOT NULL REFERENCES word_pools(id) ON DELETE CASCADE,
+      en TEXT NOT NULL,
+      pl TEXT NOT NULL,
+      icon TEXT,
+      position INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS pool_words_pool_idx ON pool_words(pool_id);
   `);
   if(database===pool)databaseReady=true;
 }
@@ -244,7 +263,7 @@ function sanitizeProgress(input){
 const STATIC_FILES={
   '/':'index.html','/index.html':'index.html','/app.js':'app.js','/words.js':'words.js','/styles.css':'styles.css',
   '/patterns.js':'patterns.js','/sentence-gen.js':'sentence-gen.js','/stories.js':'stories.js','/dialogues.js':'dialogues.js',
-  '/errors.js':'errors.js','/journey.js':'journey.js',
+  '/errors.js':'errors.js','/journey.js':'journey.js','/pool-parser.js':'pool-parser.js',
   '/sw.js':'sw.js','/manifest.webmanifest':'manifest.webmanifest','/icon-192.png':'icon-192.png',
   '/icon-512.png':'icon-512.png','/icon-maskable.png':'icon-maskable.png'
 };
@@ -328,6 +347,69 @@ async function handleApi(request,response,pathname){
     const track=cleanTrack(body.track);
     await pool.query('UPDATE students SET track=$1 WHERE id=$2',[track,session.studentId]);
     return json(response,200,{track});
+  }
+  // ===== PULE SŁÓWEK =====
+  // Uczeń zarządza własnymi pulami; administrator zarządza pulami wskazanego
+  // ucznia. Wspólna funkcja pilnuje, czyją pulę wolno dotknąć.
+  if(pathname==='/api/pools'&&request.method==='GET'){
+    const session=await getSession(request);
+    if(!session)return json(response,401,{error:'Zaloguj się.'});
+    let studentId=null;
+    if(session.role==='student') studentId=session.studentId;
+    else { const url=new URL(request.url,'http://x'); studentId=url.searchParams.get('student'); }
+    if(!studentId)return json(response,400,{error:'Brak wskazanego ucznia.'});
+    // Dwa proste zapytania zamiast jednego skorelowanego: pule, potem liczby
+    // słów po jednej puli. Prostsze i przenośne między bazą testową a produkcją.
+    const pools=await pool.query('SELECT id,name,created_by FROM word_pools WHERE student_id=$1 ORDER BY created_at DESC',[studentId]);
+    const withCounts=[];
+    for(const row of pools.rows){
+      const c=await pool.query('SELECT COUNT(*) AS n FROM pool_words WHERE pool_id=$1',[row.id]);
+      withCounts.push({id:row.id,name:row.name,createdBy:row.created_by,words:Number(c.rows[0].n)||0});
+    }
+    return json(response,200,{pools:withCounts});
+  }
+  if(pathname==='/api/pools'&&request.method==='POST'){
+    const session=await getSession(request);
+    if(!session)return json(response,401,{error:'Zaloguj się.'});
+    const body=await readJson(request);
+    const name=String(body.name||'').replace(/\s+/g,' ').trim().slice(0,60);
+    if(!name)return json(response,400,{error:'Podaj nazwę puli.'});
+    let studentId=null,createdBy='student';
+    if(session.role==='student') studentId=session.studentId;
+    else { studentId=String(body.student||''); createdBy='teacher'; }
+    if(!studentId)return json(response,400,{error:'Brak wskazanego ucznia.'});
+    // Parsujemy wklejoną listę po stronie serwera: nie ufamy podglądowi klienta.
+    const parsed=parseWordList(body.list||'',{maxEntries:300});
+    const track=body.track==='world'?'world':'school';
+    const id=crypto.randomUUID();
+    await pool.query('INSERT INTO word_pools(id,student_id,name,created_by) VALUES($1,$2,$3,$4)',[id,studentId,name,createdBy]);
+    let position=0;
+    for(const entry of parsed.entries){
+      const icon=track==='world'?null:guessIcon(entry.en);
+      await pool.query('INSERT INTO pool_words(id,pool_id,en,pl,icon,position) VALUES($1,$2,$3,$4,$5,$6)',
+        [crypto.randomUUID(),id,entry.en,entry.pl,icon,position++]);
+    }
+    return json(response,201,{pool:{id,name,words:parsed.entries.length},rejected:parsed.rejected});
+  }
+  if(pathname.startsWith('/api/pools/')&&request.method==='GET'){
+    const session=await getSession(request);
+    if(!session)return json(response,401,{error:'Zaloguj się.'});
+    const poolId=pathname.split('/')[3];
+    const owner=await pool.query('SELECT student_id FROM word_pools WHERE id=$1',[poolId]);
+    if(!owner.rows.length)return json(response,404,{error:'Nie ma takiej puli.'});
+    if(session.role==='student'&&owner.rows[0].student_id!==session.studentId)return json(response,403,{error:'To nie jest twoja pula.'});
+    const words=await pool.query('SELECT en,pl,icon FROM pool_words WHERE pool_id=$1 ORDER BY position',[poolId]);
+    return json(response,200,{words:words.rows});
+  }
+  if(pathname.startsWith('/api/pools/')&&request.method==='DELETE'){
+    const session=await getSession(request);
+    if(!session)return json(response,401,{error:'Zaloguj się.'});
+    const poolId=pathname.split('/')[3];
+    const owner=await pool.query('SELECT student_id FROM word_pools WHERE id=$1',[poolId]);
+    if(!owner.rows.length)return json(response,404,{error:'Nie ma takiej puli.'});
+    if(session.role==='student'&&owner.rows[0].student_id!==session.studentId)return json(response,403,{error:'To nie jest twoja pula.'});
+    await pool.query('DELETE FROM word_pools WHERE id=$1',[poolId]);
+    return json(response,200,{deleted:true});
   }
   if(pathname==='/api/admin/login'&&request.method==='POST'){
     if(ADMIN_PASSWORD.length<12)return json(response,503,{error:'Administrator nie ma jeszcze ustawionego bezpiecznego hasła.'});
