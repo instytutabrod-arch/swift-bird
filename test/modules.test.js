@@ -483,3 +483,17 @@ test('M2: dźwięk mają klocki zadania oraz klocki podpowiedzi', () => {
   // Generator jest wpięty w renderPattern.
   assert.match(app, /SENTENCE_GEN\.makeSentenceTask\(item\.pattern/, 'generator nie jest wpięty do układania zdań');
 });
+
+test('tryb testowy pozwala przełączać ścieżkę bez dotykania konta', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  // W trybie testowym ścieżka jest lokalna (testTrack), nie z currentUser.
+  assert.match(app, /let testTrack=/, 'brak lokalnej ścieżki trybu testowego');
+  assert.match(app, /if\(inTestMode\(\)\) return testTrack;/, 'currentTrack musi w trybie testowym czytać testTrack');
+  // Przełącznik w trybie testowym NIE woła serwera.
+  const toggle = app.slice(app.indexOf("trackToggle.addEventListener"), app.indexOf("trackToggle.addEventListener") + 600);
+  assert.match(toggle, /if\(inTestMode\(\)\)\{[\s\S]*?testTrack=next;[\s\S]*?return;/,
+    'w trybie testowym przełącznik musi działać lokalnie i wyjść przed wywołaniem API');
+  // enterTestMode ustawia ścieżkę na start i stosuje ją.
+  assert.match(app, /testTrack='school';/);
+  assert.match(app, /function enterTestMode\(\)\{[\s\S]*?applyTrackToInterface\(\);/);
+});

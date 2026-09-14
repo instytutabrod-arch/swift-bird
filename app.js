@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '11.16';
+const APP_VERSION = '11.17';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -597,7 +597,11 @@ function patternItems(patternId){ return PATTERN_ITEMS.filter(item=>item.pattern
 /* Ścieżka steruje tym, co widać: 'school' to wyprawa Jerzyka i gramatyka
    z lekcji, 'world' to angielski użytkowy. Nieznane wartości traktujemy
    jak 'school', żeby stare konta działały bez zmian. */
+let testTrack='school';
 function currentTrack(){
+  // W trybie testowym ścieżka jest lokalna: admin nie ma konta ucznia,
+  // więc nie ma czego czytać ani zapisywać.
+  if(inTestMode()) return testTrack;
   const track = currentUser && currentUser.track;
   return track==='world' ? 'world' : 'school';
 }
@@ -1282,10 +1286,12 @@ async function enterAdmin(){testMode=false;$('#testBanner').hidden=true;pickVoic
 function enterTestMode(){
   if(!currentUser||currentUser.role!=='admin')return;
   testMode=true;
+  testTrack='school';
   S=emptyState();
   $('#testBanner').hidden=false;
   $('#studentName').textContent='Tryb testowy';
   $('#welcomeName').textContent='Tryb testowy';
+  applyTrackToInterface();
   setSync('tryb testowy, bez zapisu');
   renderHome();show('home');
 }
@@ -1352,6 +1358,13 @@ $('#leaveTestMode').addEventListener('click',()=>{stopSpeech();clearTimeout(adva
 const trackToggle=$('#trackToggle');
 if(trackToggle) trackToggle.addEventListener('click',async ()=>{
   const next=currentTrack()==='world'?'school':'world';
+  if(inTestMode()){
+    // Tryb testowy nie dotyka żadnego konta: przełączamy tylko lokalnie.
+    testTrack=next;
+    applyTrackToInterface();
+    renderHome();
+    return;
+  }
   try{
     await api('/api/student/track',{method:'POST',body:{track:next}});
     currentUser.track=next;
