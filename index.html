@@ -52,7 +52,7 @@
       </form>
       <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
       <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
-      <p class="version-label">Wersja 11.14</p>
+      <p class="version-label">Wersja 11.16</p>
     </div>
   </section>
 
@@ -66,6 +66,23 @@
       <h1>Nowe konto</h1>
       <p class="lead">Wymyśl swój PIN i zapamiętaj go. Będzie potrzebny przy każdym logowaniu.</p>
       <form id="studentRegister" class="form-stack" novalidate>
+        <fieldset class="track-choice">
+          <legend>Twoja ścieżka</legend>
+          <label class="track-option">
+            <input type="radio" name="track" value="school" checked>
+            <span class="track-card">
+              <strong>Szkoła</strong>
+              <span>Angielski pod program szkolny: wyprawa Jerzyka, słownictwo i gramatyka z lekcji.</span>
+            </span>
+          </label>
+          <label class="track-option">
+            <input type="radio" name="track" value="world">
+            <span class="track-card">
+              <strong>Świat</strong>
+              <span>Angielski do życia i pracy: biznes, technologia, podróże, wiedza ogólna.</span>
+            </span>
+          </label>
+        </fieldset>
         <label>Imię<input id="regFirstName" name="firstName" autocomplete="given-name" maxlength="40" required></label>
         <label>Pierwsza litera nazwiska<input id="regLastInitial" name="lastInitial" autocomplete="off" maxlength="1" required></label>
         <label>Wymyśl PIN, 4 cyfry<input id="regPin" name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="4" required></label>
@@ -90,7 +107,7 @@
         <p id="adminLoginError" class="form-error" role="alert"></p>
         <button class="primary" type="submit">Zaloguj się</button>
       </form>
-      <p class="version-label">Wersja 11.14</p>
+      <p class="version-label">Wersja 11.16</p>
     </div>
   </section>
 
@@ -105,7 +122,7 @@
     <main class="content">
       <div id="syncStatus" class="sync-status" aria-live="polite"></div>
       <section class="welcome-row">
-        <div><p class="eyebrow">Twoja nauka</p><h1 id="welcomeName">Cześć!</h1></div>
+        <div><p class="eyebrow" id="trackLabel">Ścieżka: Szkoła</p><h1 id="welcomeName">Cześć!</h1></div>
         <div class="streak"><b id="streakN">0</b><small>dni z rzędu</small></div>
       </section>
       <section class="overview" aria-label="Postępy">
@@ -116,7 +133,8 @@
         <div><b id="badgeN">0</b><span>z 7 odznak</span></div>
       </section>
       <section class="home-actions">
-        <button id="openMap" class="secondary wide" type="button">🗺️ Mapa wyprawy Jerzyka</button>
+        <button id="openMap" class="secondary wide track-school-only" type="button">🗺️ Mapa wyprawy Jerzyka</button>
+        <button id="trackToggle" class="text-button" type="button">Przełącz na Świat</button>
         <p class="journey-home-copy">Każdy zdany egzamin przesuwa Jerzyka do kolejnego miejsca. Piórka zdobywasz za trudne, dobrze wykonane zadania.</p>
         <p id="challengeLine" class="done-challenge"></p>
       </section>
@@ -248,9 +266,9 @@
           <div><p class="eyebrow">Prawdziwa mapa geograficzna</p><h2 id="journeyMapTitle">Szlak Jerzyka</h2></div>
           <div class="journey-map-legend" aria-label="Legenda"><span><i class="reached"></i>odwiedzone</span><span><i class="locked"></i>zablokowane</span></div>
         </div>
-        <div id="journeyRouteMap" class="journey-route-map" aria-label="Statyczna mapa 25 przystanków wyprawy Jerzyka"></div>
+        <div id="journeyRouteMap" class="journey-route-map" aria-label="Prawdziwa statyczna mapa geograficzna 25 przystanków wyprawy"></div>
         <p class="map-data-note">Nieruchomy podkład OpenStreetMap pokazuje rzeczywiste kraje i miejscowości. Linia łączy przystanki wymyślonej wyprawy.</p>
-        <p id="mapHint" class="map-hint" aria-live="polite">Dotknij punktu, aby zobaczyć nazwę miejsca i ciekawostkę. Zablokowane punkty pokażą, co trzeba zrobić.</p>
+        <p id="mapHint" class="map-hint" aria-live="polite">Najedź na punkt, aby zobaczyć nazwę miejsca. Dotknij go, aby sprawdzić przystanek lub warunki odblokowania.</p>
       </section>
       <h2 class="map-heading first">Przystanki i opowieści</h2>
       <ol id="mapList" class="map-list"></ol>

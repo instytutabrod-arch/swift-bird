@@ -106,6 +106,11 @@ test('M2 zachowuje zdanie po błędzie i wskazuje klocek do przesunięcia', () =
 
   const pattern=app.slice(app.indexOf('function renderPattern('),app.indexOf('function renderStory('));
   assert.match(pattern,/brick-move/);
+  assert.match(pattern,/function startPlacedDrag\(/,'brak przeciągania ułożonych klocków');
+  assert.match(pattern,/addEventListener\('pointerdown'/,'przeciąganie musi działać palcem');
+  assert.match(pattern,/placed\.splice\(drag\.from,1\)/,'przeciąganie musi zmieniać kolejność danych');
+  assert.match(pattern,/if\(!reviewed\)[\s\S]*startPlacedDrag/,'przeciąganie powinno działać przed pierwszym sprawdzeniem');
+  assert.match(pattern,/if\(reviewed&&!correct\)[\s\S]*brick-moves/,'strzałki mają służyć dopiero do korekty po sprawdzeniu');
   assert.match(pattern,/reviewed=true;refreshLine\(\)/);
   assert.doesNotMatch(pattern,/placed\.length\s*=\s*0/,'błędne zdanie nie może być kasowane');
   assert.match(pattern,/Zielone części są ułożone dobrze/);
@@ -284,51 +289,39 @@ test('wyprawa ma po jednym przystanku na sekcję i eksportuje się do przegląda
   });
 });
 
-test('wyprawa ma statyczną, wbudowaną mapę SVG bez połączeń sieciowych', () => {
+test('wyprawa ma prawdziwą, statyczną mapę i czytelne znaczniki', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 
   assert.match(html, /id="journeyRouteMap"/);
-
-  // Mapa jest rysowana w SVG z wbudowanych kształtów, nie z kafelków.
-  assert.match(app, /const LAND_SHAPES = \{/, 'brak wbudowanych zarysów lądów');
-  assert.match(app, /function drawJourneyMap\(index\)/);
-  assert.match(app, /svgEl\('path'/, 'lądy muszą być rysowane jako ścieżki SVG');
-
-  // Żadnego obcego serwera map: ani w kodzie, ani w CSP.
-  assert.doesNotMatch(app, /tile\.openstreetmap|https?:\/\/[^'"]*tile/, 'mapa nie może pobierać kafelków z sieci');
-  assert.doesNotMatch(server, /tile\.openstreetmap/, 'CSP nie może dopuszczać obcego serwera kafelków');
-  assert.match(server, /img-src 'self' data:;/, 'CSP obrazów powinno być zawężone do self i data');
-
-  // Nakładające się przystanki (1-4) rozsuwamy wachlarzem z nicią do punktu.
-  assert.match(app, /function mapMarkerPositions\(\)/);
-  assert.match(app, /map-fan-thread/, 'zbite punkty muszą mieć nić do prawdziwego miejsca');
-  // Budujemy mapMarkerPositions z jego zależnościami: kształty, wymiary,
-  // granice projekcji i sama funkcja projekcji.
-  const slice = (from, to) => app.slice(app.indexOf(from), app.indexOf(to));
-  const positions = new Function('JOURNEY_STOPS',
-    slice('const LAND_SHAPES =', 'const SVG_NS =') +
-    '\nreturn mapMarkerPositions();')(JOURNEY);
-  assert.equal(positions.length, JOURNEY.length);
-  const fanned = positions.filter(p => p.fanned).length;
-  assert.ok(fanned >= 4, 'co najmniej pierwsze cztery przystanki powinny być rozsunięte, było ' + fanned);
-  // Rozsunięte znaczniki nie mogą już leżeć na sobie.
-  const fannedPts = positions.filter(p => p.fanned);
-  for(let i = 0; i < fannedPts.length; i++){
-    for(let j = i + 1; j < fannedPts.length; j++){
-      const dist = Math.hypot(fannedPts[i].x - fannedPts[j].x, fannedPts[i].y - fannedPts[j].y);
-      assert.ok(dist > 12, 'rozsunięte znaczniki wciąż się nakładają: ' + dist.toFixed(1));
-    }
-  }
-
-  // Punkty są klikalne i odsłaniają nazwę oraz stan.
+  assert.match(html,/Prawdziwa statyczna mapa geograficzna/);
+  assert.match(app,/function mapWorldPoint\(lat,lon,zoom\)/,'brak projekcji rzeczywistych współrzędnych');
+  const projectionStart=app.indexOf('const MAP_TILE_SIZE=');
+  const projectionEnd=app.indexOf('function fitJourneyMap(');
+  const projection=new Function(app.slice(projectionStart,projectionEnd)+'\nreturn {mapWorldPoint,mapLatLon};')();
+  JOURNEY.forEach(stop=>{
+    const restored=projection.mapLatLon(projection.mapWorldPoint(stop.lat,stop.lon,4),4);
+    assert.ok(Math.abs(restored.lat-stop.lat)<1e-7,stop.place+': błędna szerokość geograficzna');
+    assert.ok(Math.abs(restored.lon-stop.lon)<1e-7,stop.place+': błędna długość geograficzna');
+  });
+  assert.match(app,/https:\/\/tile\.openstreetmap\.org\//,'brak prawdziwego podkładu mapowego');
+  assert.match(server,/img-src[^;]*https:\/\/tile\.openstreetmap\.org/,'CSP blokuje podkład mapy');
+  assert.doesNotMatch(app,/LAND_SHAPES|map-land|map-sea/,'mapa nie może być ręcznie rysowanym przybliżeniem');
+  assert.match(app,/function spreadJourneyMarkers\(points,width,height\)/,'zbite punkty nie są rozsuwane');
+  assert.match(app,/route-leader/,'rozsunięty punkt musi wskazywać prawdziwe miejsce');
+  const spreadStart=app.indexOf('function spreadJourneyMarkers(');
+  const spreadEnd=app.indexOf('function lockedStopMessage(',spreadStart);
+  const spread=new Function(app.slice(spreadStart,spreadEnd)+'\nreturn spreadJourneyMarkers;')();
+  const separated=spread([{x:100,y:100},{x:101,y:101},{x:102,y:100},{x:100,y:102}],320,460);
+  assert.ok(separated.every(point=>point.fanned),'nakładające się punkty powinny zostać rozsunięte');
+  assert.ok(Math.hypot(separated[0].x-separated[1].x,separated[0].y-separated[1].y)>20,'znaczniki nadal się nakładają');
   assert.match(app, /marker\.addEventListener\('click',\(\)=>showJourneyStopHint\(position\)\)/,
     'punkty mapy muszą reagować na dotknięcie');
-  assert.match(app, /'aria-label', reached/, 'znacznik potrzebuje etykiety dostępności');
-
-  // Mapa jest nieruchoma: bez zoomu, przeciągania i przerysowań przy resize.
-  assert.doesNotMatch(app, /journey-map-controls|Powiększ mapę|pointerdown|addEventListener\('resize'/,
+  assert.match(app,/function lockedStopMessage\(position\)/,'zablokowany punkt musi wyjaśniać warunki');
+  assert.match(app,/function showJourneyStopHint\(position\)/,'dotknięcie punktu nie może kończyć się błędem');
+  assert.match(app,/make\('span','route-marker-label',stop\.place\)/,'brak nazw po najechaniu');
+  assert.doesNotMatch(app, /journey-map-controls|Powiększ mapę|canvas\.addEventListener\('pointerdown'/,
     'mapa ma pozostać statyczna');
 });
 
@@ -337,7 +330,7 @@ test('wszystkie pliki modułów są serwowane i trafiają do pamięci offline', 
   const worker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const dockerfile = fs.readFileSync(path.join(root, 'Dockerfile'), 'utf8');
-  ['patterns.js', 'stories.js', 'dialogues.js', 'errors.js', 'journey.js'].forEach(file => {
+  ['patterns.js', 'sentence-gen.js', 'stories.js', 'dialogues.js', 'errors.js', 'journey.js'].forEach(file => {
     assert.ok(server.includes("'/" + file + "'"), 'serwer nie wystawia ' + file);
     assert.ok(worker.includes("'./" + file + "'"), 'brak w pamięci offline: ' + file);
     assert.ok(html.includes('src="./' + file + '"'), 'brak w HTML: ' + file);
@@ -450,40 +443,43 @@ test('warunek odznaki detektywa jest osiągalny', () => {
   assert.equal(tests.detective({ errorCards: few }), false, 'próg nie może być trywialny');
 });
 
-test('generator zdań tworzy sensowne warianty i zawsze zwraca zdanie', () => {
+test('generator zdań tworzy warianty dopiero po poznaniu wzorca i słów', () => {
   const gen = require('../sentence-gen');
-  const owned = new Set(['cat','dog','sister','ball','box','table','happy','sad','key','apple','bird','tree','book','desk']);
+  const owned = new Set(['cat','dog','sister','ball','box','table','happy','sad','key','apple','bird','tree','book','desk','play','read','on','in','under','room','garden']);
 
   Object.keys(gen.TEMPLATES).forEach(patternId => {
-    // Poziom 0: zawsze kotwica, nigdy generator.
+    // Na początku aplikacja zachowuje ręcznie napisane zdanie z patterns.js.
     const anchor = gen.makeSentenceTask(patternId, owned, 0);
-    assert.ok(anchor && anchor.tokens.length >= 3, patternId + ': brak kotwicy');
-    assert.equal(anchor.fromGenerator, false, patternId + ': poziom 0 musi dać kotwicę');
-    assert.ok(/[?.!]/.test(anchor.tokens[anchor.tokens.length-1]), patternId + ': brak znaku końca');
+    assert.equal(anchor, null, patternId + ': generator nie powinien zastępować pierwszych ćwiczeń');
 
-    // Wyższy poziom: zdanie nadal powstaje i jest strukturalnie poprawne.
-    for(let i = 0; i < 30; i++){
+    // Wyższy poziom: losowo pojawiają się poprawne warianty do utrwalenia.
+    const generated=[];
+    for(let i = 0; i < 100; i++){
       const task = gen.makeSentenceTask(patternId, owned, 4);
-      assert.ok(task && task.tokens.length >= 3, patternId + ': generator zwrócił puste');
+      if(!task)continue;
+      generated.push(task);
+      assert.ok(task.tokens.length >= 3, patternId + ': generator zwrócił puste');
+      assert.equal(task.fromGenerator,true);
+      assert.ok(task.promptPl,patternId+': brak zgodnej polskiej instrukcji');
       const dup = task.extra.filter(e => task.tokens.includes(e));
       assert.deepEqual(dup, [], patternId + ': pułapka dubluje poprawny klocek');
     }
+    assert.ok(generated.length>0,patternId+': generator nie utworzył żadnego wariantu');
   });
 
-  // Pusta kolekcja: generator nie ma z czego brać, ale kotwica ratuje.
-  const empty = gen.makeSentenceTask('have-got', new Set(), 5);
-  assert.ok(empty && empty.tokens.length >= 3, 'przy pustej kolekcji musi zadziałać kotwica');
+  // Bez poznanych słów wracamy do bieżącego, sprawdzonego zdania z patterns.js.
+  for(let i=0;i<20;i++)assert.equal(gen.makeSentenceTask('have-got',new Set(),5),null);
 });
 
-test('M2: dźwięk niosą klocki do układania, nie klocki przykładu', () => {
+test('M2: dźwięk mają klocki zadania oraz klocki podpowiedzi', () => {
   const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
   // Klocki banku wołają say() po dotknięciu.
   const bankBlock = app.slice(app.indexOf('pool.forEach(token =>'), app.indexOf('bank.append(brick);') + 30);
   assert.match(bankBlock, /say\(grammarSpeechText\(token\)\)/, 'klocek do układania musi wypowiadać słowo');
   assert.match(bankBlock, /brick-audio-icon/, 'klocek do układania potrzebuje ikony dźwięku');
-  // Przykład używa niemej wersji.
-  assert.match(app, /function appendSilentBricks/, 'brak niemej wersji klocków przykładu');
-  assert.match(app, /appendSilentBricks\(hint,grammarExampleTokens/, 'przykład musi używać niemych klocków');
+  // Poprzednie wymaganie: również każdy angielski klocek podpowiedzi mówi.
+  assert.doesNotMatch(app,/appendSilentBricks/,'podpowiedzi nie mogą zostać wyciszone');
+  assert.match(app,/appendGrammarBricks\(hint,grammarExampleTokens/,'przykład powinien używać klocków z dźwiękiem');
   // Generator jest wpięty w renderPattern.
   assert.match(app, /SENTENCE_GEN\.makeSentenceTask\(item\.pattern/, 'generator nie jest wpięty do układania zdań');
 });

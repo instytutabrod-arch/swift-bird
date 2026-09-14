@@ -36,8 +36,11 @@ async function initializeDatabase(database=pool){
       pin_hash TEXT NOT NULL,
       active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      last_active TIMESTAMPTZ
+      last_active TIMESTAMPTZ,
+      track TEXT NOT NULL DEFAULT 'school'
     );
+    -- Dokładamy kolumnę osobno, żeby istniejące bazy też ją dostały.
+    ALTER TABLE students ADD COLUMN IF NOT EXISTS track TEXT NOT NULL DEFAULT 'school';
     CREATE INDEX IF NOT EXISTS students_login_idx
       ON students(first_name_normalized,last_initial) WHERE active=TRUE;
     CREATE TABLE IF NOT EXISTS student_progress (
@@ -68,6 +71,8 @@ function cleanInitial(value){return String(value||'').trim().slice(0,1).toLocale
 function validFirstName(value){return /^\p{L}[\p{L} '\-]{0,39}$/u.test(value);}
 function validInitial(value){return /^\p{L}$/u.test(value);}
 function validPin(value){return /^\d{4}$/.test(String(value||''));}
+const TRACKS=new Set(['school','world']);
+function cleanTrack(value){const track=String(value||'').trim().toLowerCase();return TRACKS.has(track)?track:'school';}
 const WEAK_PINS=new Set(['0000','1111','2222','3333','4444','5555','6666','7777','8888','9999','1234','4321','1212','2121','0123','9876']);
 function generatePin(){return String(crypto.randomInt(1000,10000));}
 function tokenHash(token){return crypto.createHash('sha256').update(token).digest('hex');}
@@ -107,7 +112,7 @@ function securityHeaders(contentType){
   const headers={
     'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','X-Frame-Options':'DENY',
     'Permissions-Policy':'camera=(), geolocation=(), microphone=(self)',
-    'Content-Security-Policy':"default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    'Content-Security-Policy':"default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
   };
   if(IS_PRODUCTION)headers['Strict-Transport-Security']='max-age=31536000; includeSubDomains';
   if(contentType)headers['Content-Type']=contentType;
@@ -134,13 +139,13 @@ async function getSession(request){
   const token=parseCookies(request)[SESSION_COOKIE];
   if(!token)return null;
   const result=await pool.query(`
-    SELECT se.role,se.student_id,st.first_name,st.last_initial,st.active
+    SELECT se.role,se.student_id,st.first_name,st.last_initial,st.active,st.track
     FROM sessions se LEFT JOIN students st ON st.id=se.student_id
     WHERE se.token_hash=$1 AND se.expires_at>NOW()
   `,[tokenHash(token)]);
   const row=result.rows[0];
   if(!row||(row.role==='student'&&!row.active))return null;
-  return {role:row.role,studentId:row.student_id,firstName:row.first_name,lastInitial:row.last_initial};
+  return {role:row.role,studentId:row.student_id,firstName:row.first_name,lastInitial:row.last_initial,track:cleanTrack(row.track)};
 }
 
 async function createSession(role,studentId){
@@ -154,7 +159,7 @@ async function createSession(role,studentId){
 
 function publicUser(session){
   if(session.role==='admin')return {role:'admin',displayName:'Administrator'};
-  return {role:'student',id:session.studentId,firstName:session.firstName,lastInitial:session.lastInitial,displayName:session.firstName+' '+session.lastInitial+'.'};
+  return {role:'student',id:session.studentId,firstName:session.firstName,lastInitial:session.lastInitial,track:cleanTrack(session.track),displayName:session.firstName+' '+session.lastInitial+'.'};
 }
 
 const attempts=new Map();
@@ -281,13 +286,13 @@ async function handleApi(request,response,pathname){
     if(!validFirstName(firstName)||!validInitial(initial)||!validPin(pin))return json(response,400,{error:'Sprawdź imię, literę nazwiska i 4-cyfrowy PIN.'});
     const key=attemptKey(request,'student:'+normalizeName(firstName)+':'+initial);
     if(!allowAttempt(key))return json(response,429,{error:'Za dużo prób. Spróbuj ponownie za 15 minut.'});
-    const candidates=await pool.query('SELECT id,first_name,last_initial,pin_hash FROM students WHERE first_name_normalized=$1 AND last_initial=$2 AND active=TRUE',[normalizeName(firstName),initial]);
+    const candidates=await pool.query('SELECT id,first_name,last_initial,pin_hash,track FROM students WHERE first_name_normalized=$1 AND last_initial=$2 AND active=TRUE',[normalizeName(firstName),initial]);
     let student=null;
     for(const candidate of candidates.rows){if(await verifySecret(pin,candidate.pin_hash)){student=candidate;break;}}
     if(!student)return json(response,401,{error:'Nieprawidłowe dane lub PIN.'});
     clearAttempts(key);await pool.query('UPDATE students SET last_active=NOW() WHERE id=$1',[student.id]);
     const created=await createSession('student',student.id);
-    return json(response,200,{user:{role:'student',id:student.id,firstName:student.first_name,lastInitial:student.last_initial,displayName:student.first_name+' '+student.last_initial+'.'}},{'Set-Cookie':sessionCookie(created.token,created.seconds)});
+    return json(response,200,{user:{role:'student',id:student.id,firstName:student.first_name,lastInitial:student.last_initial,track:cleanTrack(student.track),displayName:student.first_name+' '+student.last_initial+'.'}},{'Set-Cookie':sessionCookie(created.token,created.seconds)});
   }
   if(pathname==='/api/config'&&request.method==='GET'){
     return json(response,200,{selfRegistration:SELF_REGISTRATION});
@@ -310,10 +315,19 @@ async function handleApi(request,response,pathname){
       if(await verifySecret(pin,row.pin_hash))return json(response,409,{error:'Takie konto już istnieje. Zaloguj się albo wybierz inny PIN.'});
     }
     const pinHash=await hashSecret(pin);const id=crypto.randomUUID();
-    await pool.query('INSERT INTO students(id,first_name,first_name_normalized,last_initial,pin_hash) VALUES($1,$2,$3,$4,$5)',[id,firstName,normalizeName(firstName),initial,pinHash]);
+    const track=cleanTrack(body.track);
+    await pool.query('INSERT INTO students(id,first_name,first_name_normalized,last_initial,pin_hash,track) VALUES($1,$2,$3,$4,$5,$6)',[id,firstName,normalizeName(firstName),initial,pinHash,track]);
     clearAttempts(key);
     const created=await createSession('student',id);
-    return json(response,201,{user:{role:'student',id,firstName,lastInitial:initial,displayName:firstName+' '+initial+'.'}},{'Set-Cookie':sessionCookie(created.token,created.seconds)});
+    return json(response,201,{user:{role:'student',id,firstName,lastInitial:initial,track,displayName:firstName+' '+initial+'.'}},{'Set-Cookie':sessionCookie(created.token,created.seconds)});
+  }
+  if(pathname==='/api/student/track'&&request.method==='POST'){
+    const session=await getSession(request);
+    if(!session||session.role!=='student')return json(response,401,{error:'Zaloguj się.'});
+    const body=await readJson(request);
+    const track=cleanTrack(body.track);
+    await pool.query('UPDATE students SET track=$1 WHERE id=$2',[track,session.studentId]);
+    return json(response,200,{track});
   }
   if(pathname==='/api/admin/login'&&request.method==='POST'){
     if(ADMIN_PASSWORD.length<12)return json(response,503,{error:'Administrator nie ma jeszcze ustawionego bezpiecznego hasła.'});

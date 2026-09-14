@@ -142,3 +142,51 @@ test('wulgaryzmy z rozpoznawania są wyłapywane', () => {
   assert.equal(containsBlockedWord('horse'), false);
   assert.equal(containsBlockedWord('duck'), false);
 });
+
+test('ścieżka: rejestracja zapisuje wybór, a zmiana go aktualizuje', async () => {
+  const memory = newDb();
+  const adapter = memory.adapters.createPg();
+  const database = new adapter.Pool();
+  await initializeDatabase(database);
+  useDatabaseForTests(database);
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const post = (p, body, cookie) => fetch(base + p, {
+    method: 'POST',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, cookie ? { Cookie: cookie } : {}),
+    body: JSON.stringify(body)
+  });
+
+  try{
+    // Rejestracja na ścieżkę Świat.
+    const created = await post('/api/student/register', { firstName: 'Ala', lastInitial: 'W', pin: '7391', pinRepeat: '7391', track: 'world' });
+    assert.equal(created.status, 201);
+    const payload = await created.json();
+    assert.equal(payload.user.track, 'world', 'rejestracja musi zwrócić wybraną ścieżkę');
+    const cookie = created.headers.get('set-cookie').split(';')[0];
+
+    // /api/me potwierdza ścieżkę z sesji.
+    const me = await (await fetch(base + '/api/me', { headers: { Cookie: cookie } })).json();
+    assert.equal(me.user.track, 'world');
+
+    // Zmiana ścieżki na Szkołę.
+    const changed = await post('/api/student/track', { track: 'school' }, cookie);
+    assert.equal(changed.status, 200);
+    assert.equal((await changed.json()).track, 'school');
+
+    // Logowanie zwraca zaktualizowaną ścieżkę.
+    const login = await post('/api/student/login', { firstName: 'Ala', lastInitial: 'W', pin: '7391' });
+    assert.equal((await login.json()).user.track, 'school');
+
+    // Domyślna ścieżka bez podania to Szkoła (stare konta).
+    const legacy = await post('/api/student/register', { firstName: 'Bea', lastInitial: 'K', pin: '5082', pinRepeat: '5082' });
+    assert.equal((await legacy.json()).user.track, 'school', 'brak wyboru = Szkoła');
+
+    // Nieznana wartość ścieżki jest sprowadzana do Szkoły, nie zapisywana surowo.
+    const weird = await post('/api/student/register', { firstName: 'Cyt', lastInitial: 'Z', pin: '6173', pinRepeat: '6173', track: 'hacker' });
+    assert.equal((await weird.json()).user.track, 'school', 'nieznana ścieżka musi zejść do Szkoły');
+  }finally{
+    await new Promise(resolve => server.close(resolve));
+    await database.end();
+  }
+});

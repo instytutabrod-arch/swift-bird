@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '11.14';
+const APP_VERSION = '11.16';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -594,6 +594,22 @@ let testMode=false;
 function inTestMode(){ return testMode && currentUser && currentUser.role==='admin'; }
 
 function patternItems(patternId){ return PATTERN_ITEMS.filter(item=>item.pattern===patternId); }
+/* Ścieżka steruje tym, co widać: 'school' to wyprawa Jerzyka i gramatyka
+   z lekcji, 'world' to angielski użytkowy. Nieznane wartości traktujemy
+   jak 'school', żeby stare konta działały bez zmian. */
+function currentTrack(){
+  const track = currentUser && currentUser.track;
+  return track==='world' ? 'world' : 'school';
+}
+function applyTrackToInterface(){
+  const world = currentTrack()==='world';
+  document.body.classList.toggle('track-world', world);
+  document.body.classList.toggle('track-school', !world);
+  const label=$('#trackLabel');
+  if(label) label.textContent = world ? 'Ścieżka: Świat' : 'Ścieżka: Szkoła';
+  const toggle=$('#trackToggle');
+  if(toggle) toggle.textContent = world ? 'Przełącz na Szkołę' : 'Przełącz na Świat';
+}
 function collectedVocabulary(){
   return new Set(CARDS.filter(card=>seen(card.id)).map(card=>card.en.toLowerCase()));
 }
@@ -666,6 +682,7 @@ function renderSentenceHub(){
 function enterStudent(){
   $('#studentName').textContent=currentUser.displayName;
   $('#welcomeName').textContent='Cześć, '+currentUser.firstName+'!';
+  applyTrackToInterface();
   setSync('zapisano');
   /* Po aktualizacji aplikacji sprawdzamy także wcześniejsze osiągnięcia.
      Dzięki temu uczeń, który spełnił warunek przed dodaniem galerii,
@@ -1316,11 +1333,13 @@ $('#studentRegister').addEventListener('submit',async event=>{
   if(pin!==repeat){error.textContent='Oba PIN-y muszą być takie same.';$('#regPinRepeat').focus();return;}
   const button=event.submitter||event.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
   try{
+    const trackChoice=document.querySelector('input[name="track"]:checked');
     const data=await api('/api/student/register',{method:'POST',body:{
       firstName:$('#regFirstName').value,
       lastInitial:$('#regLastInitial').value,
       pin,
-      pinRepeat:repeat
+      pinRepeat:repeat,
+      track:trackChoice?trackChoice.value:'school'
     }});
     currentUser=data.user;await loadProgress();enterStudent();event.target.reset();
   }catch(problem){error.textContent=problem.message;}finally{button.disabled=false;}
@@ -1330,6 +1349,16 @@ api('/api/config').then(config=>{ if(config&&config.selfRegistration)$('#openReg
 $('#openTestMode').addEventListener('click',enterTestMode);
 $('#testVoice').addEventListener('click',()=>{pickVoice();say('Hello. This is your English voice.');});
 $('#leaveTestMode').addEventListener('click',()=>{stopSpeech();clearTimeout(advanceTimer);enterAdmin();});
+const trackToggle=$('#trackToggle');
+if(trackToggle) trackToggle.addEventListener('click',async ()=>{
+  const next=currentTrack()==='world'?'school':'world';
+  try{
+    await api('/api/student/track',{method:'POST',body:{track:next}});
+    currentUser.track=next;
+    applyTrackToInterface();
+    renderHome();
+  }catch(problem){ toast('Nie udało się zmienić ścieżki.'); }
+});
 $('#openAdminLogin').addEventListener('click',()=>show('admin-login'));
 $('#backToStudentLogin').addEventListener('click',()=>show('login'));
 $('#studentLogin').addEventListener('submit',async event=>{
@@ -1640,18 +1669,6 @@ function grammarSpeechText(token){
   return spoken[token]||token;
 }
 
-/* Klocki bez dźwięku, tylko wizualny wzór. Używane dla zdania-przykładu
-   w M2, żeby dźwięk pozostał wyłącznie na klockach do układania. */
-function appendSilentBricks(host,tokens,className='grammar-bricks'){
-  const row=make('span',className+' silent');
-  (tokens||[]).forEach(token=>{
-    const brick=make('span','grammar-brick'+(/^[?.!,]$/.test(token)?' punctuation':''),token);
-    row.append(brick);
-  });
-  host.append(row);
-  return row;
-}
-
 function appendGrammarBricks(host,tokens,className='grammar-bricks'){
   const row=make('span',className);
   (tokens||[]).forEach(token=>{
@@ -1729,19 +1746,21 @@ function renderPattern(stage,item){
 
   const prompt = make('div','prompt');
   prompt.append(make('p','ask','Krok 1 z 3 · Ułóż zdanie po angielsku'));
-  prompt.append(make('p','pattern-pl',item.pl));
+  const patternPrompt=make('p','pattern-pl',item.pl);
+  prompt.append(patternPrompt);
   if(showHint){
     const hint=make('div','pattern-hint');
     hint.append(make('span','pattern-hint-label','Przykład'));
-    /* Klocki przykładu są nieme: dźwięk niosą klocki do układania.
-       Przykład służy tylko za wzór wizualny. */
-    appendSilentBricks(hint,grammarExampleTokens(item.example));
+    appendGrammarBricks(hint,grammarExampleTokens(item.example));
     prompt.append(hint);
   }
   stage.append(prompt);
 
   const grammarHelp=buildGrammarHelp(item.pattern);
   stage.append(grammarHelp);
+
+  const arrangeHelp=make('p','sentence-arrange-help','Dotknij klocków, aby je dodać. Przed sprawdzeniem możesz przeciągać ułożone słowa palcem i zmieniać ich kolejność.');
+  stage.append(arrangeHelp);
 
   const line = make('div','sentence-line');
   line.setAttribute('aria-label','Twoje zdanie');
@@ -1755,14 +1774,18 @@ function renderPattern(stage,item){
   stage.append(feedback);
 
   const placed = [];
-  /* Zdanie powstaje z generatora: kotwica na niskich poziomach, warianty
-     z kolekcji na wyższych. Gdy generator nie ma z czego złożyć sensownego
-     zdania, spada na sztywne item.tokens — zadanie zawsze się pojawi. */
+  /* Pierwsze spotkania korzystają z ręcznie przygotowanych item.tokens.
+     Dopiero przy utrwalaniu generator może ułożyć wariant ze słów, które
+     dziecko ma w kolekcji. Jeśli nie ma bezpiecznego wariantu, zostaje
+     bieżące, sprawdzone zdanie z patterns.js. */
   let target = item.tokens;
   let extraBricks = item.extra;
   if(typeof SENTENCE_GEN !== 'undefined' && item.pattern){
     const task = SENTENCE_GEN.makeSentenceTask(item.pattern, collectedVocabulary(), level);
-    if(task && task.tokens && task.tokens.length){ target = task.tokens; extraBricks = task.extra; }
+    if(task && task.tokens && task.tokens.length){
+      target=task.tokens;extraBricks=task.extra;
+      if(task.promptPl)patternPrompt.textContent=task.promptPl;
+    }
   }
   const sentenceText=sentenceTextFromTokens(target);
   const pool = shuffle(useExtra ? target.concat(extraBricks) : target.slice());
@@ -1770,6 +1793,65 @@ function renderPattern(stage,item){
   let arrangementReady = false;
   let spellingReady = false;
   let completed = false;
+  let placedDrag=null;
+  let suppressPlacedClick=false;
+
+  function clearPlacedDragVisuals(){
+    if(placedDrag&&placedDrag.slot){
+      placedDrag.slot.classList.remove('dragging');
+      placedDrag.slot.style.transform='';
+    }
+    line.classList.remove('reordering');
+    line.querySelectorAll('.brick-slot').forEach(slot=>slot.classList.remove('drag-target'));
+  }
+
+  function startPlacedDrag(event,index,slot,brick){
+    if(reviewed||placed.length<2||(event.pointerType==='mouse'&&event.button!==0))return;
+    const centers=[...line.querySelectorAll('.brick-slot')].map((candidate,candidateIndex)=>{
+      const rect=candidate.getBoundingClientRect();
+      return {index:candidateIndex,x:rect.left+rect.width/2,y:rect.top+rect.height/2};
+    });
+    placedDrag={pointerId:event.pointerId,from:index,target:index,startX:event.clientX,startY:event.clientY,moved:false,slot,brick,centers};
+    try{brick.setPointerCapture(event.pointerId);}catch(error){}
+  }
+
+  function movePlacedDrag(event){
+    if(!placedDrag||event.pointerId!==placedDrag.pointerId)return;
+    const dx=event.clientX-placedDrag.startX;
+    const dy=event.clientY-placedDrag.startY;
+    if(!placedDrag.moved&&Math.hypot(dx,dy)<8)return;
+    placedDrag.moved=true;
+    event.preventDefault();
+    line.classList.add('reordering');
+    placedDrag.slot.classList.add('dragging');
+    placedDrag.slot.style.transform='translate('+dx+'px,'+dy+'px) scale(1.04)';
+    let nearest=placedDrag.centers[0];
+    placedDrag.centers.forEach(candidate=>{
+      if(Math.hypot(event.clientX-candidate.x,event.clientY-candidate.y)<Math.hypot(event.clientX-nearest.x,event.clientY-nearest.y))nearest=candidate;
+    });
+    placedDrag.target=nearest.index;
+    line.querySelectorAll('.brick-slot').forEach((slot,slotIndex)=>slot.classList.toggle('drag-target',slotIndex===nearest.index&&slot!==placedDrag.slot));
+  }
+
+  function finishPlacedDrag(event,cancelled=false){
+    if(!placedDrag||event.pointerId!==placedDrag.pointerId)return;
+    const drag=placedDrag;
+    try{drag.brick.releasePointerCapture(event.pointerId);}catch(error){}
+    clearPlacedDragVisuals();
+    placedDrag=null;
+    if(cancelled||!drag.moved)return;
+    suppressPlacedClick=true;
+    if(drag.from!==drag.target){
+      const moving=placed.splice(drag.from,1)[0];
+      placed.splice(drag.target,0,moving);
+    }
+    refreshLine();refreshCheck();
+    setTimeout(()=>{suppressPlacedClick=false;},0);
+  }
+
+  line.addEventListener('pointermove',movePlacedDrag);
+  line.addEventListener('pointerup',event=>finishPlacedDrag(event));
+  line.addEventListener('pointercancel',event=>finishPlacedDrag(event,true));
 
   function refreshLine(){
     line.textContent = '';
@@ -1784,8 +1866,13 @@ function renderPattern(stage,item){
         brick.disabled=true;
         brick.setAttribute('aria-label',item.token+' — poprawne miejsce');
       }else{
-        brick.setAttribute('aria-label',reviewed?'Usuń błędny klocek: '+item.token:'Odłóż klocek: '+item.token);
+        if(!reviewed){
+          brick.classList.add('reorderable');
+          brick.setAttribute('aria-label',item.token+' — dotknij, aby odłożyć, albo przeciągnij, aby zmienić miejsce');
+          brick.addEventListener('pointerdown',event=>startPlacedDrag(event,index,slot,brick));
+        }else brick.setAttribute('aria-label','Usuń błędny klocek: '+item.token);
         brick.addEventListener('click',()=>{
+          if(suppressPlacedClick){suppressPlacedClick=false;return;}
           const removed=placed.splice(index,1)[0];
           if(removed&&removed.source)removed.source.disabled=false;
           refreshLine();refreshCheck();
@@ -1804,7 +1891,7 @@ function renderPattern(stage,item){
       }
       line.append(slot);
     });
-    if(!placed.length) line.append(make('span','line-empty','Dotknij klocków poniżej'));
+    if(!placed.length) line.append(make('span','line-empty','Dotknij klocków poniżej. Ułożone słowa możesz przeciągać.'));
     if(reviewed&&tokens.length===target.length&&marks.every(Boolean)){
       feedback.className='fb good';
       feedback.textContent='Wszystkie klocki są zielone. Sprawdź poprawione zdanie.';
@@ -1824,8 +1911,8 @@ function renderPattern(stage,item){
   pool.forEach(token => {
     const brick = make('button','brick brick-audio',token);
     brick.type = 'button';
-    /* Klocek do układania wypowiada swoje słowo po dotknięciu. To on niesie
-       dźwięk, nie przykład na górze. Interpunkcja milczy. */
+    /* Klocek do układania wypowiada swoje słowo po dotknięciu. Przykłady
+       w podpowiedziach także mają własny dźwięk. Interpunkcja milczy. */
     const isPunctuation=/^[?.!,]$/.test(token);
     if(!isPunctuation){
       const icon=make('span','brick-audio-icon','🔊');
@@ -2046,6 +2133,7 @@ function renderPattern(stage,item){
       feedback.className = 'fb good';
       feedback.textContent = 'Zdanie jest ułożone poprawnie: '+sentenceText;
       checkButton.disabled = true;checkButton.hidden=true;bank.hidden=true;
+      arrangeHelp.hidden=true;
       bank.querySelectorAll('.brick').forEach(brick => brick.disabled = true);
       if(lastIncorrectSentence){
         wrongContrastText.textContent=lastIncorrectSentence;
@@ -2062,6 +2150,7 @@ function renderPattern(stage,item){
     noteMistake('pattern',item.id);
     feedback.className = 'fb bad';
     reviewed=true;refreshLine();
+    arrangeHelp.textContent='Po sprawdzeniu poprawne części zostają zielone. Czerwone klocki przesuń strzałką albo dotknij, aby je wymienić.';
     /* Zdanie zostaje na miejscu. Kolory i strzałki prowadzą do samodzielnej
        korekty, zamiast kasować dziecku całą wykonaną pracę. */
     feedback.textContent = attempts >= 2
@@ -2492,117 +2581,224 @@ function renderOrdering(stage,item){
 
 /* ==================== EKRAN WYPRAWY ==================== */
 
-/* ==================== STATYCZNA MAPA WYPRAWY ====================
-   Mapa jest w pełni statyczna i wbudowana: rysowane w SVG uproszczone
-   zarysy lądów, bez ani jednego zapytania do sieci, więc działa offline
-   i nie wymaga w CSP żadnego obcego źródła. Kształty są celowo proste,
-   mają dać dziecku poczucie kierunku podróży, nie odwzorować geografię. */
-const LAND_SHAPES = {
-  eurasia: [[-10,36],[-9,44],[0,49],[2,51],[8,54],[12,55],[10,58],[20,60],[28,60],[30,66],[40,66],[55,68],[70,72],[90,75],[110,74],[140,72],[160,70],[170,66],[178,62],[170,60],[160,58],[145,54],[142,48],[135,44],[128,40],[122,38],[120,32],[115,24],[110,20],[108,14],[103,8],[100,6],[95,10],[92,16],[88,20],[80,12],[77,8],[72,20],[68,24],[62,24],[58,24],[55,26],[50,30],[44,38],[36,40],[30,36],[28,40],[22,40],[16,38],[10,38],[0,36],[-10,36]],
-  africa: [[-16,28],[-16,20],[-17,14],[-12,8],[-8,4],[8,4],[10,-2],[14,-10],[12,-18],[18,-28],[20,-34],[26,-34],[32,-28],[40,-16],[42,-4],[51,10],[44,12],[36,16],[34,24],[32,30],[24,32],[10,34],[-4,36],[-10,32],[-16,28]],
-  seasia: [[95,6],[100,2],[104,-2],[110,-6],[118,-8],[125,-8],[132,-4],[141,-2],[150,-6],[148,-10],[140,-9],[132,-8],[122,-8],[114,-8],[106,-6],[100,0],[96,3],[95,6]],
-  australia: [[113,-22],[114,-30],[118,-35],[124,-34],[130,-32],[137,-35],[140,-38],[146,-39],[150,-37],[153,-28],[146,-19],[142,-11],[135,-12],[130,-14],[123,-17],[116,-20],[113,-22]],
-  tasmania: [[144,-41],[148,-41],[148,-43.5],[145,-43.5],[144,-41]],
-  japan: [[130,31],[135,34],[140,37],[142,43],[140,45],[138,42],[135,35],[131,32],[130,31]]
-};
-const MAP_W = 860, MAP_H = 520, MAP_PAD = 34;
-/* Granice projekcji policzone raz z lądów, żeby cała trasa i wszystkie
-   kontynenty zawsze mieściły się w ramce niezależnie od rozmiaru ekranu. */
-const MAP_BOUNDS = (() => {
-  const all = Object.values(LAND_SHAPES).flat();
+const MAP_TILE_SIZE=256;
+const MAP_MIN_ZOOM=1;
+const MAP_MAX_ZOOM=6;
+let journeyMapState={zoom:2,centerLat:18,centerLon:83};
+let journeyMapResizeBound=false;
+let journeyMapResizeTimer=null;
+
+/* Standardowa projekcja Web Mercator używana przez OpenStreetMap. Dzięki
+   niej każdy punkt szlaku leży na prawdziwych współrzędnych mapy, a nie
+   na ręcznie narysowanym przybliżeniu kontynentów. */
+function mapWorldPoint(lat,lon,zoom){
+  const world=MAP_TILE_SIZE*Math.pow(2,zoom);
+  const safeLat=Math.max(-85.05112878,Math.min(85.05112878,Number(lat)));
+  const sin=Math.sin(safeLat*Math.PI/180);
   return {
-    minLon: Math.min(...all.map(p=>p[0])), maxLon: Math.max(...all.map(p=>p[0])),
-    minLat: Math.min(...all.map(p=>p[1])), maxLat: Math.max(...all.map(p=>p[1]))
-  };
-})();
-function mapProject(lon,lat){
-  const b = MAP_BOUNDS;
-  return {
-    x: MAP_PAD + (lon-b.minLon)/(b.maxLon-b.minLon)*(MAP_W-2*MAP_PAD),
-    y: MAP_PAD + (b.maxLat-lat)/(b.maxLat-b.minLat)*(MAP_H-2*MAP_PAD)
+    x:(Number(lon)+180)/360*world,
+    y:(0.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*world
   };
 }
 
-/* Wachlarz: przystanki leżące zbyt blisko siebie (Jerzykowo, Warszawa,
-   Poznań, Puszcza Zielonka nakładają się w skali świata) rozsuwamy po
-   łuku, a cienka nić łączy odsunięty znacznik z prawdziwym punktem. */
-function mapMarkerPositions(){
-  const base = JOURNEY_STOPS.map(stop => mapProject(stop.lon,stop.lat));
-  const positions = base.map(point => ({ x:point.x, y:point.y, anchorX:point.x, anchorY:point.y, fanned:false }));
-  const used = new Array(base.length).fill(false);
-  for(let i=0;i<base.length;i++){
-    if(used[i]) continue;
-    const cluster = [i]; used[i] = true;
-    for(let j=i+1;j<base.length;j++){
-      if(used[j]) continue;
-      if(Math.hypot(base[j].x-base[i].x, base[j].y-base[i].y) < 24){ cluster.push(j); used[j] = true; }
+function mapLatLon(point,zoom){
+  const world=MAP_TILE_SIZE*Math.pow(2,zoom);
+  const lon=(point.x/world)*360-180;
+  const n=Math.PI-(2*Math.PI*point.y/world);
+  return {lat:180/Math.PI*Math.atan(Math.sinh(n)),lon:((lon+540)%360)-180};
+}
+
+function fitJourneyMap(width,height){
+  const safeWidth=Math.max(320,width||860);
+  const safeHeight=Math.max(300,height||480);
+  let chosen=MAP_MIN_ZOOM;let bounds=null;
+  for(let zoom=MAP_MAX_ZOOM;zoom>=MAP_MIN_ZOOM;zoom--){
+    const points=JOURNEY_STOPS.map(stop=>mapWorldPoint(stop.lat,stop.lon,zoom));
+    const xs=points.map(point=>point.x);const ys=points.map(point=>point.y);
+    const candidate={minX:Math.min(...xs),maxX:Math.max(...xs),minY:Math.min(...ys),maxY:Math.max(...ys)};
+    if(candidate.maxX-candidate.minX<=safeWidth-72&&candidate.maxY-candidate.minY<=safeHeight-82){chosen=zoom;bounds=candidate;break;}
+  }
+  if(!bounds){
+    const points=JOURNEY_STOPS.map(stop=>mapWorldPoint(stop.lat,stop.lon,chosen));
+    const xs=points.map(point=>point.x);const ys=points.map(point=>point.y);
+    bounds={minX:Math.min(...xs),maxX:Math.max(...xs),minY:Math.min(...ys),maxY:Math.max(...ys)};
+  }
+  const center=mapLatLon({x:(bounds.minX+bounds.maxX)/2,y:(bounds.minY+bounds.maxY)/2},chosen);
+  journeyMapState={zoom:chosen,centerLat:center.lat,centerLon:center.lon};
+}
+
+/* Na mapie całej trasy blisko położone miasta miałyby znaczniki jeden na
+   drugim. Rozsuwamy tylko same przyciski, a cienka linia nadal wskazuje ich
+   prawdziwą pozycję geograficzną na podkładzie OpenStreetMap. */
+function spreadJourneyMarkers(points,width,height){
+  const threshold=30;
+  const positions=points.map(point=>({x:point.x,y:point.y,anchorX:point.x,anchorY:point.y,fanned:false}));
+  const used=new Array(points.length).fill(false);
+  for(let start=0;start<points.length;start++){
+    if(used[start])continue;
+    const cluster=[start];used[start]=true;
+    for(let cursor=0;cursor<cluster.length;cursor++){
+      const origin=points[cluster[cursor]];
+      for(let candidate=0;candidate<points.length;candidate++){
+        if(used[candidate])continue;
+        if(Math.hypot(points[candidate].x-origin.x,points[candidate].y-origin.y)<threshold){
+          cluster.push(candidate);used[candidate]=true;
+        }
+      }
     }
-    if(cluster.length > 1){
-      const radius = 34;
-      const spread = Math.PI*1.1;
-      const start = -Math.PI/2 - spread/2;
-      cluster.forEach((idx,order) => {
-        const angle = start + (spread*order)/(cluster.length-1);
-        positions[idx] = {
-          x: base[idx].x + Math.cos(angle)*radius,
-          y: base[idx].y + Math.sin(angle)*radius,
-          anchorX: base[idx].x, anchorY: base[idx].y, fanned: true
-        };
-      });
-    }
+    if(cluster.length<2)continue;
+    const centerX=cluster.reduce((sum,index)=>sum+points[index].x,0)/cluster.length;
+    const centerY=cluster.reduce((sum,index)=>sum+points[index].y,0)/cluster.length;
+    const radius=cluster.length>=5?(width<500?36:45):(width<500?29:35);
+    const fullCircle=cluster.length>=4;
+    const spread=fullCircle?Math.PI*2:Math.PI;
+    const firstAngle=fullCircle?-Math.PI/2:-Math.PI;
+    cluster.forEach((pointIndex,order)=>{
+      const angle=firstAngle+(fullCircle?spread*order/cluster.length:spread*order/(cluster.length-1));
+      positions[pointIndex]={
+        x:Math.max(24,Math.min(width-24,centerX+Math.cos(angle)*radius)),
+        y:Math.max(24,Math.min(height-24,centerY+Math.sin(angle)*radius)),
+        anchorX:points[pointIndex].x,anchorY:points[pointIndex].y,fanned:true
+      };
+    });
   }
   return positions;
 }
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
-function svgEl(name,attrs){
-  const el = document.createElementNS(SVG_NS,name);
-  Object.entries(attrs||{}).forEach(([key,value]) => el.setAttribute(key,String(value)));
-  return el;
+function lockedStopMessage(position){
+  const stop=JOURNEY_STOPS[position];
+  const passedCount=S.passedExams.length;
+  const currentSectionIndex=Math.min(passedCount,SECTIONS.length-1);
+  const section=SECTIONS[currentSectionIndex];
+  const collected=sectionCollected(currentSectionIndex);
+  const missingWords=Math.max(0,20-collected);
+  const remainingExams=Math.max(1,position-passedCount);
+  const firstStep=missingWords>0
+    ? 'Najpierw zbierz jeszcze '+missingWords+' '+(missingWords===1?'słowo':'słów')+' w sekcji '+(currentSectionIndex+1)+' „'+section.name+'”, a potem zdaj jej egzamin.'
+    : 'Masz już 20 słów. Zdaj egzamin sekcji '+(currentSectionIndex+1)+' „'+section.name+'”.';
+  const distance=remainingExams===1
+    ? 'To otworzy ten przystanek.'
+    : 'Liczba egzaminów pozostałych do tego miejsca: '+remainingExams+'.';
+  return 'Przystanek '+(position+1)+' — '+stop.place+' jest jeszcze zablokowany. '+firstStep+' '+distance;
 }
 
-function drawJourneyMap(index){
-  const host = $('#journeyRouteMap');
-  host.textContent = '';
+function showJourneyStopHint(position){
+  const hint=$('#mapHint');
+  const reached=position<=journeyIndex();
+  hint.className='map-hint '+(reached?'reached':'locked');
+  hint.textContent=reached
+    ? 'Przystanek '+(position+1)+' — '+JOURNEY_STOPS[position].place+', '+JOURNEY_STOPS[position].country+' jest odblokowany. Jego polską i angielską opowieść znajdziesz poniżej mapy.'
+    : lockedStopMessage(position);
+  document.querySelectorAll('.route-marker').forEach(marker=>marker.classList.toggle('selected',Number(marker.dataset.stop)===position));
+}
 
-  const svg = svgEl('svg',{ class:'journey-map', viewBox:'0 0 '+MAP_W+' '+MAP_H, role:'img',
-    'aria-label':'Mapa wyprawy Jerzyka, przystanek '+(index+1)+' z '+JOURNEY_STOPS.length });
-  svg.append(svgEl('rect',{ x:0, y:0, width:MAP_W, height:MAP_H, class:'map-sea' }));
+function renderJourneyRoute(index){
+  const host=$('#journeyRouteMap');
+  host.textContent='';
+  const width=Math.max(320,Math.round(host.clientWidth||860));
+  const height=Math.max(300,Math.round(host.clientHeight||480));
+  fitJourneyMap(width,height);
+  drawJourneyMap(index,width,height);
+  if(!journeyMapResizeBound){
+    journeyMapResizeBound=true;
+    window.addEventListener('resize',()=>{
+      clearTimeout(journeyMapResizeTimer);
+      journeyMapResizeTimer=setTimeout(()=>{
+        const mapHost=$('#journeyRouteMap');
+        if(!mapHost||!$('#s-map').classList.contains('on'))return;
+        fitJourneyMap(mapHost.clientWidth,mapHost.clientHeight);
+        drawJourneyMap(journeyIndex(),mapHost.clientWidth,mapHost.clientHeight);
+      },160);
+    });
+  }
+}
 
-  Object.values(LAND_SHAPES).forEach(poly => {
-    const d = 'M' + poly.map(p => { const q = mapProject(p[0],p[1]); return q.x.toFixed(1)+','+q.y.toFixed(1); }).join(' L') + ' Z';
-    svg.append(svgEl('path',{ d, class:'map-land' }));
-  });
+function drawJourneyMap(index,requestedWidth,requestedHeight){
+  const host=$('#journeyRouteMap');
+  const width=Math.max(320,Math.round(requestedWidth||host.clientWidth||860));
+  const height=Math.max(300,Math.round(requestedHeight||host.clientHeight||480));
+  const zoom=journeyMapState.zoom;
+  const center=mapWorldPoint(journeyMapState.centerLat,journeyMapState.centerLon,zoom);
+  const left=center.x-width/2;const top=center.y-height/2;
+  host.textContent='';
 
-  const stopPoints = JOURNEY_STOPS.map(stop => mapProject(stop.lon,stop.lat));
-  const routeLine = points => points.map(p => p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
-  svg.append(svgEl('polyline',{ class:'map-route-track', points:routeLine(stopPoints) }));
-  if(index >= 0) svg.append(svgEl('polyline',{ class:'map-route-done', points:routeLine(stopPoints.slice(0,index+1)) }));
+  const canvas=make('div','journey-map-canvas');
+  host.append(canvas);
 
-  const positions = mapMarkerPositions();
-  positions.forEach((pos,position) => {
-    if(pos.fanned){
-      svg.append(svgEl('line',{ x1:pos.anchorX, y1:pos.anchorY, x2:pos.x, y2:pos.y, class:'map-fan-thread' }));
+  const minTileX=Math.floor(left/MAP_TILE_SIZE);
+  const maxTileX=Math.floor((left+width)/MAP_TILE_SIZE);
+  const minTileY=Math.max(0,Math.floor(top/MAP_TILE_SIZE));
+  const maxTileY=Math.min(Math.pow(2,zoom)-1,Math.floor((top+height)/MAP_TILE_SIZE));
+  const tileStatus=make('p','map-tile-status','Do wyświetlenia mapy potrzebne jest połączenie z internetem.');
+  tileStatus.hidden=true;
+  let tileFailureShown=false;
+  for(let tileY=minTileY;tileY<=maxTileY;tileY++){
+    for(let rawTileX=minTileX;rawTileX<=maxTileX;rawTileX++){
+      const tileX=((rawTileX%Math.pow(2,zoom))+Math.pow(2,zoom))%Math.pow(2,zoom);
+      const tile=make('img','map-tile');
+      tile.alt='';tile.draggable=false;tile.decoding='async';
+      tile.src='https://tile.openstreetmap.org/'+zoom+'/'+tileX+'/'+tileY+'.png';
+      tile.style.left=(rawTileX*MAP_TILE_SIZE-left)+'px';
+      tile.style.top=(tileY*MAP_TILE_SIZE-top)+'px';
+      tile.addEventListener('error',()=>{
+        if(tileFailureShown)return;
+        tileFailureShown=true;tileStatus.hidden=false;
+      });
+      canvas.append(tile);
     }
+  }
+
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg');
+  svg.setAttribute('class','journey-map-overlay');
+  svg.setAttribute('aria-hidden','true');
+  svg.setAttribute('viewBox','0 0 '+width+' '+height);
+  const addLine=(className,points)=>{
+    const line=document.createElementNS(ns,'polyline');line.setAttribute('class',className);
+    line.setAttribute('points',points.map(point=>point.x.toFixed(1)+','+point.y.toFixed(1)).join(' '));
+    svg.append(line);
+  };
+  const points=JOURNEY_STOPS.map(stop=>{
+    const point=mapWorldPoint(stop.lat,stop.lon,zoom);
+    return {x:point.x-left,y:point.y-top};
   });
+  addLine('route-track',points);
+  addLine('route-progress',points.slice(0,index+1));
+  const markerPoints=spreadJourneyMarkers(points,width,height);
+  markerPoints.forEach(point=>{
+    if(!point.fanned)return;
+    const leader=document.createElementNS(ns,'line');
+    leader.setAttribute('class','route-leader');
+    leader.setAttribute('x1',point.anchorX.toFixed(1));leader.setAttribute('y1',point.anchorY.toFixed(1));
+    leader.setAttribute('x2',point.x.toFixed(1));leader.setAttribute('y2',point.y.toFixed(1));
+    svg.append(leader);
+  });
+  canvas.append(svg);
 
-  host.append(svg);
-
-  /* Znaczniki to zwykłe przyciski nad SVG, żeby były klikalne i dostępne.
-     Pozycjonujemy je w procentach, więc skalują się z szerokością mapy. */
-  positions.forEach((pos,position) => {
-    const stop = JOURNEY_STOPS[position];
-    const reached = position <= index;
-    const marker = make('button','route-marker '+(reached?'reached':'locked')+(position===index?' current':''),String(position+1));
-    marker.type = 'button';
-    marker.style.left = (pos.x/MAP_W*100)+'%';
-    marker.style.top = (pos.y/MAP_H*100)+'%';
-    marker.setAttribute('aria-label', reached
-      ? 'Przystanek '+(position+1)+': '+stop.place+', '+stop.country+(position===index?', obecne miejsce':', odblokowany')
-      : 'Przystanek '+(position+1)+': '+stop.place+', zablokowany');
+  JOURNEY_STOPS.forEach((stop,position)=>{
+    const point=markerPoints[position];
+    const reached=position<=index;
+    const marker=make('button','route-marker '+(reached?'reached':'locked')+(position===index?' current':''),String(position+1));
+    marker.type='button';marker.dataset.stop=String(position);
+    marker.style.left=point.x+'px';marker.style.top=point.y+'px';
+    marker.title=stop.place+', '+stop.country;
+    marker.setAttribute('aria-label',reached
+      ? 'Przystanek '+(position+1)+': '+stop.place+', '+stop.country+(position===index?'. Obecne miejsce.':'. Odblokowany.')
+      : 'Przystanek '+(position+1)+': '+stop.place+'. Zablokowany. Dotknij, aby sprawdzić wymagania.');
+    const label=make('span','route-marker-label',stop.place);
+    label.setAttribute('aria-hidden','true');
+    if(point.x<110)label.classList.add('align-left');
+    else if(point.x>width-110)label.classList.add('align-right');
+    if(point.y<58)label.classList.add('below');
+    marker.append(label);
     marker.addEventListener('click',()=>showJourneyStopHint(position));
-    host.append(marker);
+    canvas.append(marker);
   });
+
+  const attribution=make('div','osm-attribution');
+  const attributionLink=make('a','','© OpenStreetMap contributors');
+  attributionLink.href='https://www.openstreetmap.org/copyright';attributionLink.target='_blank';attributionLink.rel='noopener noreferrer';
+  attribution.append(attributionLink);host.append(attribution,tileStatus);
 }
 
 function renderMap(){
@@ -2610,8 +2806,8 @@ function renderMap(){
   $('#mapLead').textContent = 'Jerzyk jest na przystanku ' + (index+1) + ' z ' + JOURNEY_STOPS.length +
     '. Każdy zdany egzamin przenosi go dalej.';
   $('#mapHint').className='map-hint';
-  $('#mapHint').textContent='Dotknij punktu, aby zobaczyć nazwę miejsca i ciekawostkę. Zablokowane punkty pokażą, co trzeba zrobić.';
-  drawJourneyMap(index);
+  $('#mapHint').textContent='Najedź na punkt, aby zobaczyć nazwę miejsca. Dotknij go, aby sprawdzić przystanek lub warunki odblokowania.';
+  renderJourneyRoute(index);
   const list = $('#mapList');
   list.textContent = '';
   JOURNEY_STOPS.forEach((stop,position) => {

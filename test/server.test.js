@@ -32,7 +32,7 @@ test('pełny przepływ API: administrator, konto ucznia i postęp', async () => 
   try{
     const health=await fetch(base+'/api/health');assert.equal(health.status,200);
     assert.equal(health.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
-    assert.match(health.headers.get('content-security-policy'),/img-src 'self' data:;/);
+    assert.match(health.headers.get('content-security-policy'),/img-src[^;]*https:\/\/tile\.openstreetmap\.org/);
 
     const adminLogin=await post('/api/admin/login',{password:'bezpieczne-haslo-testowe'});
     assert.equal(adminLogin.status,200);const adminCookie=adminLogin.headers.get('set-cookie').split(';')[0];

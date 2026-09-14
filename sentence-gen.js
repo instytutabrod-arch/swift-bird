@@ -81,6 +81,7 @@ function ing(verb){
 const TEMPLATES = {
   'to-be-positive': {
     name: 'Kim jestem, jaki jestem',
+    promptPl: 'Ułóż zdanie opisujące osobę lub rzecz.',
     pos: ['zaimek/rzecz.', 'to be', 'przymiotnik'],
     anchors: [
       ['She','is','happy','.'],
@@ -98,6 +99,7 @@ const TEMPLATES = {
   },
   'to-be-question': {
     name: 'Pytanie i przeczenie z to be',
+    promptPl: 'Ułóż pytanie o osobę lub rzecz.',
     anchors: [
       ['Is','she','happy','?'],
       ['Are','you','tired','?'],
@@ -114,6 +116,7 @@ const TEMPLATES = {
   },
   'have-got': {
     name: 'Co mam',
+    promptPl: 'Ułóż zdanie mówiące, co ktoś ma.',
     anchors: [
       ['I','have','got','a','sister','.'],
       ['She','has','got','two','cats','.'],
@@ -129,6 +132,7 @@ const TEMPLATES = {
   },
   'present-simple': {
     name: 'Co robię zwykle',
+    promptPl: 'Ułóż zdanie o codziennej czynności.',
     anchors: [
       ['We','play','football','on','Monday','.'],
       ['She','reads','a','book','.'],
@@ -144,6 +148,7 @@ const TEMPLATES = {
   },
   'present-continuous': {
     name: 'Co dzieje się teraz',
+    promptPl: 'Ułóż zdanie o tym, co dzieje się teraz.',
     anchors: [
       ['He','is','running','now','.'],
       ['I','am','eating','an','apple','.'],
@@ -159,6 +164,7 @@ const TEMPLATES = {
   },
   'prepositions': {
     name: 'Gdzie to jest',
+    promptPl: 'Ułóż zdanie mówiące, gdzie znajduje się rzecz.',
     anchors: [
       ['The','cat','is','under','the','table','.'],
       ['The','book','is','on','the','desk','.'],
@@ -176,6 +182,7 @@ const TEMPLATES = {
   },
   'wh-questions': {
     name: 'Pytania Wh-',
+    promptPl: 'Ułóż pytanie o miejsce rzeczy.',
     anchors: [
       ['Where','is','my','bag','?'],
       ['What','is','your','name','?'],
@@ -212,7 +219,9 @@ function tokensToSentence(tokens){
  */
 function makeSentenceTask(patternId, collected, level){
   const template = TEMPLATES[patternId];
-  if(!template) return null;
+  /* Pierwsze dwa spotkania korzystają z dokładnie przetłumaczonych zdań
+     zapisanych w patterns.js. Generator służy dopiero do utrwalania. */
+  if(!template || level < 2 || Math.random() >= 0.6) return null;
   const owned = collected instanceof Set ? collected : new Set(collected || []);
 
   // Kolekcja bywa zapisana małymi literami, więc porównujemy po lowercase.
@@ -223,17 +232,10 @@ function makeSentenceTask(patternId, collected, level){
     return candidates[Math.floor(Math.random() * candidates.length)];
   };
 
-  let tokens = null;
-  // Pierwsze spotkania: zawsze kotwica. Później: próbujemy generatora,
-  // ale tylko jeśli kolekcja pozwala złożyć sensowne zdanie.
-  const useGenerator = level >= 2 && Math.random() < 0.6;
-  if(useGenerator && template.build){
-    tokens = template.build(pickFrom);
-  }
-  if(!tokens){
-    const anchors = template.anchors;
-    tokens = anchors[Math.floor(Math.random() * anchors.length)].slice();
-  }
+  const tokens = template.build ? template.build(pickFrom) : null;
+  /* Brak odpowiednich, już poznanych słów oznacza powrót do bieżącego
+     zdania z patterns.js, zamiast podstawiania dziecku obcych wyrazów. */
+  if(!tokens)return null;
 
   // Klocki-pułapki: więcej na wyższych poziomach, nigdy nie dublują
   // klocka poprawnego.
@@ -248,7 +250,8 @@ function makeSentenceTask(patternId, collected, level){
     tokens,
     extra,
     sentence: tokensToSentence(tokens),
-    fromGenerator: Boolean(useGenerator && tokens)
+    promptPl: template.promptPl,
+    fromGenerator: true
   };
 }
 

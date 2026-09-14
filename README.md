@@ -1,4 +1,4 @@
-# Swift-bird — wersja 11.12
+# Swift-bird — wersja 11.15
 
 Szkolna aplikacja internetowa do nauki angielskich słów i budowania zdań. Uczniowie logują się
 bez adresu e-mail: imieniem, pierwszą literą nazwiska i indywidualnym
@@ -25,8 +25,13 @@ urządzeniach po zalogowaniu na to samo konto.
   w kolekcji; następne zdania pojawiają się wraz z poznawaniem słownictwa;
 - 70 zdań tworzy 7 kolejnych etapów; następny etap otwiera się po poprawnym
   ułożeniu 3 różnych zdań w poprzednim;
+- pierwsze spotkania ze wzorcem używają ręcznie przygotowanych zdań, a podczas
+  utrwalania generator może tworzyć nowe, sensowne warianty wyłącznie ze słów
+  znajdujących się już w kolekcji dziecka;
+- przed pierwszym sprawdzeniem dziecko zmienia kolejność ułożonych słów przez
+  przeciąganie klocków palcem lub myszą;
 - po błędzie w zdaniu poprawne fragmenty pozostają zielone, błędne są czerwone
-  i można przesuwać je strzałkami w lewo lub w prawo albo wymienić;
+  i można precyzyjnie przesuwać je strzałkami w lewo lub w prawo albo wymienić;
 - po samodzielnym poprawieniu błędu pojawia się dobrowolne porównanie dźwiękowe:
   wcześniejsza błędna wersja jest czytana raz, a zaraz po niej zawsze poprawna;
 - po poprawnym ułożeniu uczeń musi samodzielnie przepisać całe zdanie wraz
@@ -45,7 +50,8 @@ urządzeniach po zalogowaniu na to samo konto.
   prawdziwą, statyczną mapę OpenStreetMap z 25 przystankami umieszczonymi
   według ich współrzędnych; drugi przystanek to Warszawa, po najechaniu
   na punkt pojawia się nazwa miejsca, a dotknięcie zablokowanego punktu
-  podaje liczbę brakujących słów i egzaminów;
+  podaje liczbę brakujących słów i egzaminów; blisko położone znaczniki są
+  czytelnie rozsunięte i połączone linią z prawdziwą lokalizacją;
 - wyprawa i historyjki o jerzyku mają wersję polską i angielską, a wersję
   angielską można odtworzyć lektorem;
 - panel administratora tworzy konta, pokazuje postępy i generuje nowy PIN;
@@ -92,11 +98,11 @@ Serwer sam tworzy wymagane tabele przy pierwszym uruchomieniu.
 railway up ./swift-bird --path-as-root -s swift-bird
 ```
 
-Jeżeli rozpakowany katalog na Macu nazywa się `swift-bird-v11.12`, użyj jego pełnej
+Jeżeli rozpakowany katalog na Macu nazywa się `swift-bird-v11.15`, użyj jego pełnej
 ścieżki zamiast `./swift-bird`:
 
 ```bash
-railway up "/Users/iwwdm/Downloads/swift-bird-v11.12" --path-as-root -s swift-bird
+railway up "/Users/iwwdm/Downloads/swift-bird-v11.15" --path-as-root -s swift-bird
 ```
 
 Istniejąca domena Railway pozostaje bez zmian.
@@ -114,7 +120,7 @@ językowego albo przeglądu przez nauczyciela.
 | Moduł | Poziom | Plik z treścią | Na czym polega |
 |---|---|---|---|
 | M1 Kolekcja słów | zapamiętanie | `words.js` | 500 słów, wymowa, pisownia, powtórki, egzamin par |
-| M2 Klocki zdań | zrozumienie, pisanie i mówienie | `patterns.js` | 7 wzorców, 70 zdań; układanie, obowiązkowe przepisywanie, dobrowolna pomoc gramatyczna i obowiązkowe czytanie na głos |
+| M2 Klocki zdań | zrozumienie, pisanie i mówienie | `patterns.js`, `sentence-gen.js` | 7 wzorców, 70 zdań bazowych i bezpieczne warianty; układanie, obowiązkowe przepisywanie, dobrowolna pomoc gramatyczna i obowiązkowe czytanie na głos |
 | M3 Historyjki | zrozumienie | `stories.js` | 8 tekstów; pytanie o główną myśl i o szczegół |
 | M4 Sytuacje | zastosowanie | `dialogues.js` | 8 dialogów, 24 tury; odpowiedź głosem, pełnym zdaniem |
 | M5 Detektyw | analiza | `errors.js` | 20 błędów z uzasadnieniem, 6 porównań, 6 układanek |
@@ -126,9 +132,10 @@ Trzy najważniejsze konsekwencje w kodzie:
   próbuje samodzielnie. Na każdym poziomie może rozwinąć pomoc z planem
   zdania, częściami mowy i przykładami; po dwóch błędach pomoc otwiera się
   automatycznie.
-- **Informacja zwrotna, która nie wyręcza.** Po błędzie ułożenie pozostaje na
-  ekranie: prawidłowy podciąg jest zielony, a czerwone klocki dziecko przesuwa
-  lub wymienia. Po kolejnej próbie dostaje podpowiedź o początku zdania. Dopiero
+- **Informacja zwrotna, która nie wyręcza.** Przed sprawdzeniem dziecko może
+  dowolnie przeciągać klocki palcem. Po błędzie ułożenie pozostaje na ekranie:
+  prawidłowy podciąg jest zielony, a czerwone klocki dziecko precyzyjnie przesuwa
+  strzałkami lub wymienia. Po kolejnej próbie dostaje podpowiedź o początku zdania. Dopiero
   po korekcie może włączyć porównanie błędnego brzmienia z prawidłowym; błędna
   wersja nigdy nie jest odtwarzana automatycznie ani jako ostatnia.
 - **Bank błędów zasilany własnymi pomyłkami.** Każdy błąd w M2 i M4 trafia do
