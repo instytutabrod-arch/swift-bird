@@ -12,7 +12,7 @@ COPY server.js ./server.js
 # więc musi leżeć obok server.js, a przeglądarka ładuje go z /public.
 COPY pool-parser.js ./pool-parser.js
 COPY index.html ./public/index.html
-COPY app.js words.js patterns.js sentence-gen.js pool-parser.js stories.js dialogues.js errors.js journey.js styles.css sw.js manifest.webmanifest ./public/
+COPY app.js words.js patterns.js sentence-gen.js pool-parser.js levels.js tenses.js stories.js dialogues.js errors.js journey.js styles.css sw.js manifest.webmanifest ./public/
 COPY icon-192.png icon-512.png icon-maskable.png ./public/
 
 USER node

@@ -52,7 +52,7 @@
       </form>
       <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
       <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
-      <p class="version-label">Wersja 12.0</p>
+      <p class="version-label">Wersja 12.1</p>
     </div>
   </section>
 
@@ -107,7 +107,7 @@
         <p id="adminLoginError" class="form-error" role="alert"></p>
         <button class="primary" type="submit">Zaloguj się</button>
       </form>
-      <p class="version-label">Wersja 12.0</p>
+      <p class="version-label">Wersja 12.1</p>
     </div>
   </section>
 
@@ -139,6 +139,7 @@
       <section class="home-actions">
         <button id="openMap" class="secondary wide track-school-only" type="button">🗺️ Mapa wyprawy Jerzyka</button>
         <button id="openPools" class="secondary wide" type="button">📚 Moje pule słówek</button>
+        <button id="openTenses" class="secondary wide" type="button">⏳ Czasy angielskie</button>
         <button id="trackToggle" class="text-button" type="button">Przełącz na Świat</button>
         <p class="journey-home-copy track-school-only">Każdy zdany egzamin przesuwa Jerzyka do kolejnego miejsca. Piórka zdobywasz za trudne, dobrze wykonane zadania.</p>
         <p id="challengeLine" class="done-challenge"></p>
@@ -252,6 +253,45 @@
     </main>
   </section>
 
+  <section id="s-tenses" class="screen app-screen">
+    <header class="simple-header"><button id="tensesBack" class="back-button" type="button">← Wróć</button><span>Czasy angielskie</span></header>
+    <main class="content narrow">
+      <p class="lead">Każdy czas uczysz się przez kontrast: to samo zdanie w dwóch czasach, żeby poczuć różnicę. Nie regułka, tylko działanie.</p>
+      <div id="tensesList" class="tenses-list"></div>
+    </main>
+  </section>
+
+  <section id="s-tense" class="screen app-screen">
+    <header class="simple-header"><button id="tenseBack" class="back-button" type="button">← Czasy</button><span id="tenseHeaderName">Czas</span></header>
+    <main class="content narrow">
+      <div class="tense-tags"><span id="tenseCefr" class="tag-cefr">A1</span><span id="tenseBloom" class="tag-bloom">Zastosowanie</span></div>
+      <p id="tenseShort" class="tense-short"></p>
+      <section class="tense-form">
+        <p class="eyebrow">Jak to zbudować</p>
+        <p id="tenseForm" class="tense-form-text"></p>
+        <div id="tenseExamples" class="tense-examples"></div>
+      </section>
+      <section class="tense-contrast">
+        <p class="eyebrow">Poczuj różnicę</p>
+        <p id="tenseContrastPrompt" class="tense-contrast-prompt"></p>
+        <div class="tense-contrast-pair">
+          <button id="tenseContrastA" class="tense-contrast-line" type="button"></button>
+          <button id="tenseContrastB" class="tense-contrast-line" type="button"></button>
+        </div>
+        <p id="tenseContrastNote" class="tense-contrast-note"></p>
+      </section>
+      <button id="tenseStartDrills" class="primary wide" type="button">Ćwicz ten czas</button>
+    </main>
+  </section>
+
+  <section id="s-tense-drill" class="screen app-screen">
+    <header class="simple-header"><button id="tenseDrillBack" class="back-button" type="button">← Przerwij</button><span id="tenseDrillName">Ćwiczenia</span></header>
+    <main class="content narrow">
+      <div class="bar"><i id="tenseDrillFill"></i></div>
+      <div id="tenseDrillStage"></div>
+    </main>
+  </section>
+
   <section id="s-pools" class="screen app-screen">
     <header class="simple-header"><button id="poolsBack" class="back-button" type="button">← Wróć</button><span>Pule słówek</span></header>
     <main class="content narrow">
@@ -360,6 +400,8 @@
   <script src="./patterns.js"></script>
   <script src="./sentence-gen.js"></script>
   <script src="./pool-parser.js"></script>
+  <script src="./levels.js"></script>
+  <script src="./tenses.js"></script>
   <script src="./stories.js"></script>
   <script src="./dialogues.js"></script>
   <script src="./errors.js"></script>

@@ -233,7 +233,7 @@ function sanitizeDoneMap(raw,limit){
 function sanitizeProgress(input){
   const raw=input&&typeof input==='object'?input:{};
   const state={schema:3,cards:{},streak:0,lastDay:null,sessions:0,passedExams:[],
-    patterns:{},errorCards:{},stories:{},dialogues:{},poolCards:{},
+    patterns:{},errorCards:{},stories:{},dialogues:{},poolCards:{},tenses:{},
     mistakes:[],feathers:0,badges:[],stages:0};
   state.streak=clampCount(raw.streak,10000);
   state.sessions=clampCount(raw.sessions,100000);
@@ -245,6 +245,14 @@ function sanitizeProgress(input){
   state.errorCards=sanitizeCardMap(raw.errorCards,200);
   // Postęp nauki z pul, osobno od 500 słów głównych. Klucz to pool:<id>:<en>.
   state.poolCards=sanitizeCardMap(raw.poolCards,2000);
+  // Postęp czasów: {ok,done} per czas, do 50 czasów.
+  state.tenses={};
+  if(raw.tenses&&typeof raw.tenses==='object'){
+    Object.entries(raw.tenses).slice(0,50).forEach(([id,v])=>{
+      if(!v||typeof v!=='object')return;
+      state.tenses[id]={ok:clampCount(v.ok,100000),done:clampCount(v.done,100000)};
+    });
+  }
   state.stories=sanitizeDoneMap(raw.stories,100);
   state.dialogues=sanitizeDoneMap(raw.dialogues,100);
   const passed=Array.isArray(raw.passedExams)?raw.passedExams:[];
@@ -265,7 +273,7 @@ function sanitizeProgress(input){
 const STATIC_FILES={
   '/':'index.html','/index.html':'index.html','/app.js':'app.js','/words.js':'words.js','/styles.css':'styles.css',
   '/patterns.js':'patterns.js','/sentence-gen.js':'sentence-gen.js','/stories.js':'stories.js','/dialogues.js':'dialogues.js',
-  '/errors.js':'errors.js','/journey.js':'journey.js','/pool-parser.js':'pool-parser.js',
+  '/errors.js':'errors.js','/journey.js':'journey.js','/pool-parser.js':'pool-parser.js','/levels.js':'levels.js','/tenses.js':'tenses.js',
   '/sw.js':'sw.js','/manifest.webmanifest':'manifest.webmanifest','/icon-192.png':'icon-192.png',
   '/icon-512.png':'icon-512.png','/icon-maskable.png':'icon-maskable.png'
 };

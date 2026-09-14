@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '12.0';
+const APP_VERSION = '12.1';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -212,7 +212,7 @@ let syncRevision = 0;
 
 function emptyState(){
   return {schema:3,cards:{},streak:0,lastDay:null,sessions:0,passedExams:[],
-    patterns:{},errorCards:{},stories:{},dialogues:{},poolCards:{},
+    patterns:{},errorCards:{},stories:{},dialogues:{},poolCards:{},tenses:{},
     mistakes:[],feathers:0,badges:[],stages:0};
 }
 
@@ -3148,3 +3148,211 @@ function renderPoolPick(stage,item){
   });
   stage.append(opts);
 }
+
+/* ==================== CZASY ANGIELSKIE ==================== */
+
+const TENSE_LIST = (window.TENSES || []);
+const TENSE_ORDER_LIST = (window.TENSE_ORDER || []);
+const LV = (window.LEVELS || {});
+let activeTense = null, tenseDrillQueue = [], tenseDrillDone = 0, tenseDrillHits = 0;
+
+/* Postęp czasów w S.tenses: {ok, done} per czas. Osobno od słów i pul. */
+function tenseProgress(id){ return (S.tenses && S.tenses[id]) || {ok:0,done:0}; }
+
+function renderTensesList(){
+  const host = $('#tensesList');
+  host.textContent = '';
+  TENSE_ORDER_LIST.forEach(id => {
+    const tense = TENSE_LIST.find(t => t.id === id);
+    if(!tense) return;
+    const prog = tenseProgress(id);
+    const card = make('button','tense-card');
+    card.type = 'button';
+    const head = make('div','tense-card-head');
+    head.append(make('strong','',tense.name));
+    const tags = make('span','tense-card-tags');
+    tags.append(make('span','tag-cefr',tense.cefr));
+    const bloom = LV.BLOOM_BY_ID ? LV.BLOOM_BY_ID[tense.bloom] : null;
+    tags.append(make('span','tag-bloom',bloom?bloom.name:tense.bloom));
+    head.append(tags);
+    card.append(head);
+    card.append(make('span','tense-card-short',tense.short));
+    if(prog.done>0) card.append(make('span','tense-card-meta',prog.ok+' / '+prog.done+' dobrze'));
+    card.addEventListener('click',()=>openTense(tense.id));
+    host.append(card);
+  });
+}
+
+function openTense(id){
+  const tense = TENSE_LIST.find(t => t.id === id);
+  if(!tense) return;
+  activeTense = tense;
+  $('#tenseHeaderName').textContent = tense.name;
+  $('#tenseCefr').textContent = tense.cefr;
+  const bloom = LV.BLOOM_BY_ID ? LV.BLOOM_BY_ID[tense.bloom] : null;
+  $('#tenseBloom').textContent = bloom ? bloom.name : tense.bloom;
+  $('#tenseShort').textContent = tense.short;
+  $('#tenseForm').textContent = tense.form;
+
+  const ex = $('#tenseExamples'); ex.textContent = '';
+  tense.examples.forEach(sentence => {
+    const line = make('button','tense-example',sentence);
+    line.type = 'button';
+    line.addEventListener('click',()=>say(sentence));
+    ex.append(line);
+  });
+
+  // Kontrast: dwa zdania różniące się tylko czasem, każde do odsłuchania.
+  $('#tenseContrastPrompt').textContent = tense.contrast.prompt;
+  const a = $('#tenseContrastA'), b = $('#tenseContrastB');
+  a.textContent = tense.contrast.a; b.textContent = tense.contrast.b;
+  a.onclick = () => say(tense.contrast.a);
+  b.onclick = () => say(tense.contrast.b);
+  $('#tenseContrastNote').textContent = tense.contrast.note || '';
+
+  show('tense');
+}
+
+function startTenseDrills(){
+  if(!activeTense) return;
+  tenseDrillQueue = activeTense.drills.slice();
+  tenseDrillDone = 0; tenseDrillHits = 0;
+  $('#tenseDrillName').textContent = activeTense.name;
+  show('tense-drill');
+  nextTenseDrill();
+}
+
+function nextTenseDrill(){
+  const stage = $('#tenseDrillStage');
+  stage.textContent = '';
+  const total = activeTense.drills.length;
+  $('#tenseDrillFill').style.width = Math.round(tenseDrillDone/total*100)+'%';
+  if(!tenseDrillQueue.length) return finishTenseDrills();
+  const drill = tenseDrillQueue.shift();
+  if(drill.type==='choose') return renderTenseChoose(stage,drill);
+  if(drill.type==='fill') return renderTenseFill(stage,drill);
+  return renderTenseContrast(stage,drill);
+}
+
+function drillTagRow(drill){
+  const row = make('div','drill-tags');
+  row.append(make('span','tag-cefr',drill.cefr));
+  const bloom = LV.BLOOM_BY_ID ? LV.BLOOM_BY_ID[drill.bloom] : null;
+  row.append(make('span','tag-bloom',bloom?bloom.name:drill.bloom));
+  return row;
+}
+
+function recordTenseResult(correct){
+  if(!S.tenses) S.tenses={};
+  const p = S.tenses[activeTense.id] || (S.tenses[activeTense.id]={ok:0,done:0});
+  p.done++; if(correct){ p.ok++; tenseDrillHits++; }
+  tenseDrillDone++;
+  saveProgress();
+}
+
+function renderTenseChoose(stage,drill){
+  stage.append(drillTagRow(drill));
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Wybierz poprawną formę'));
+  prompt.append(make('p','tense-drill-q',drill.q));
+  stage.append(prompt);
+  const opts = make('div','opts');
+  const order = drill.options.map((text,index)=>({text,index}));
+  order.forEach(o=>{
+    const b = make('button','opt text-opt',o.text); b.type='button';
+    b.addEventListener('click',()=>{
+      [...opts.children].forEach(c=>c.disabled=true);
+      const correct = o.index===drill.correct;
+      b.classList.add(correct?'right':'wrong');
+      if(!correct){ const right=[...opts.children].find(c=>c.textContent===drill.options[drill.correct]); if(right)right.classList.add('right'); }
+      const why = make('p','drill-why',drill.why||''); stage.append(why);
+      recordTenseResult(correct);
+      clearTimeout(advanceTimer); advanceTimer=setTimeout(nextTenseDrill,correct?1200:2200);
+    });
+    opts.append(b);
+  });
+  stage.append(opts);
+}
+
+function renderTenseFill(stage,drill){
+  stage.append(drillTagRow(drill));
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Uzupełnij zdanie'));
+  prompt.append(make('p','tense-drill-q',drill.q));
+  stage.append(prompt);
+  const input=document.createElement('input');
+  input.type='text';input.className='inp';input.placeholder='wpisz formę';
+  input.autocapitalize='off';input.autocomplete='off';input.spellcheck=false;input.setAttribute('autocorrect','off');
+  stage.append(input);
+  const fb=make('p','fb',''); stage.append(fb);
+  const go=make('button','next','Sprawdź'); go.type='button'; stage.append(go);
+  let attempts=0;
+  function check(){
+    const v=input.value.trim().toLowerCase().replace(/\s+/g,' ');
+    if(!v)return;
+    if(v===drill.answer.toLowerCase()){
+      fb.className='fb good'; fb.textContent='Dobrze. '+(drill.why||'');
+      input.disabled=true; go.disabled=true;
+      recordTenseResult(attempts===0);
+      clearTimeout(advanceTimer); advanceTimer=setTimeout(nextTenseDrill,1300);
+      return;
+    }
+    attempts++;
+    if(attempts===1){/* pierwsza pomyłka liczona raz */ }
+    fb.className='fb bad';
+    fb.textContent = attempts>=2 ? ('Poprawnie: '+drill.answer) : 'Jeszcze nie. Spróbuj innej formy.';
+    if(attempts>=2){ input.disabled=true; go.disabled=true; recordTenseResult(false); clearTimeout(advanceTimer); advanceTimer=setTimeout(nextTenseDrill,1900); }
+  }
+  go.addEventListener('click',check);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();check();}});
+  setTimeout(()=>input.focus(),120);
+}
+
+function renderTenseContrast(stage,drill){
+  stage.append(drillTagRow(drill));
+  const prompt = make('div','prompt');
+  prompt.append(make('p','ask','Kontrast dwóch czasów'));
+  prompt.append(make('p','tense-drill-q',drill.prompt));
+  stage.append(prompt);
+  const opts = make('div','opts wide-opts');
+  [{text:drill.a,index:0},{text:drill.b,index:1}].forEach(o=>{
+    const b = make('button','opt text-opt',o.text); b.type='button';
+    b.addEventListener('click',()=>{
+      [...opts.children].forEach(c=>c.disabled=true);
+      const correct = o.index===drill.correct;
+      b.classList.add(correct?'right':'wrong');
+      if(!correct){ const right=[...opts.children].find((c,i)=>i===drill.correct); if(right)right.classList.add('right'); }
+      say(o.index===drill.correct?drill.a:drill.b);
+      recordTenseResult(correct);
+      clearTimeout(advanceTimer); advanceTimer=setTimeout(nextTenseDrill,correct?1200:2000);
+    });
+    opts.append(b);
+  });
+  stage.append(opts);
+}
+
+function finishTenseDrills(){
+  const stage = $('#tenseDrillStage');
+  stage.textContent = '';
+  const done = make('div','done');
+  done.append(make('h2','',activeTense.name+': gotowe'));
+  done.append(make('p','',tenseDrillHits+' z '+activeTense.drills.length+' za pierwszym razem.'));
+  const again = make('button','primary wide','Wróć do czasów'); again.type='button';
+  again.addEventListener('click',()=>{ renderTensesList(); show('tenses'); });
+  done.append(again);
+  stage.append(done);
+}
+
+function openTenses(){ renderTensesList(); show('tenses'); }
+
+// Podpięcia
+const openTensesBtn=$('#openTenses');
+if(openTensesBtn) openTensesBtn.addEventListener('click',openTenses);
+const tensesBackBtn=$('#tensesBack');
+if(tensesBackBtn) tensesBackBtn.addEventListener('click',()=>{ renderHome(); show('home'); });
+const tenseBackBtn=$('#tenseBack');
+if(tenseBackBtn) tenseBackBtn.addEventListener('click',()=>{ renderTensesList(); show('tenses'); });
+const tenseStartBtn=$('#tenseStartDrills');
+if(tenseStartBtn) tenseStartBtn.addEventListener('click',startTenseDrills);
+const tenseDrillBackBtn=$('#tenseDrillBack');
+if(tenseDrillBackBtn) tenseDrillBackBtn.addEventListener('click',()=>{ clearTimeout(advanceTimer); openTense(activeTense.id); });
