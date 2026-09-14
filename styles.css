@@ -368,6 +368,10 @@ input:focus{border-color:var(--ink-soft)}
 .track-option input:checked + .track-card{border-color:var(--yellow);background:#22437a}
 .track-option input:focus-visible + .track-card{outline:3px solid var(--yellow);outline-offset:2px}
 body.track-world .track-school-only{display:none}
+body.track-school .track-world-only{display:none}
+.world-intro{background:#1a3564;border-radius:16px;padding:18px;margin-bottom:16px}
+.world-intro h2{font-family:var(--display);font-size:1.3rem;margin:0 0 8px}
+.world-intro p{color:var(--muted);font-size:.92rem;line-height:1.6;margin:0}
 
 /* ==================== PULE SŁÓWEK ==================== */
 .pool-create{background:#1a3564;border-radius:16px;padding:16px;margin-bottom:22px;display:flex;flex-direction:column;gap:10px}

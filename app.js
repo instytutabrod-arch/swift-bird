@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '11.20';
+const APP_VERSION = '12.0';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -628,7 +628,20 @@ function applyTrackToInterface(){
   if(toggle) toggle.textContent = world ? 'Przełącz na Szkołę' : 'Przełącz na Świat';
 }
 function collectedVocabulary(){
-  return new Set(CARDS.filter(card=>seen(card.id)).map(card=>card.en.toLowerCase()));
+  const vocab=new Set(CARDS.filter(card=>seen(card.id)).map(card=>card.en.toLowerCase()));
+  // Słowa z pul dokładamy do generatora, ale TYLKO te, które pasują do ról
+  // semantycznych szablonów. Biznesowe czy podróżne słowa nie mają roli,
+  // więc generator i tak by ich nie użył — nie wciskamy ich na siłę, bo
+  // dałoby to zdania bez sensu. To działa realnie dla pul szkolnych.
+  if(typeof SENTENCE_GEN!=='undefined' && SENTENCE_GEN.SEM && S.poolCards){
+    const roleWords=new Set();
+    Object.values(SENTENCE_GEN.SEM).forEach(list=>list.forEach(w=>roleWords.add(String(w).toLowerCase())));
+    Object.keys(S.poolCards).forEach(key=>{
+      const en=key.split(':').slice(2).join(':').toLowerCase();
+      if(en && roleWords.has(en)) vocab.add(en);
+    });
+  }
+  return vocab;
 }
 function itemVocabularyReady(item,vocabulary=collectedVocabulary()){
   return inTestMode()||(item.vocab||[]).every(word=>vocabulary.has(word.toLowerCase()));
@@ -1013,9 +1026,10 @@ function startStage(){
   queue = buildStage(stage.id);
   if(!queue.length){ stageIndex++; return startStage(); }
   stageStartedAt = Date.now();
-  $('#playSectionName').textContent = sessionOrigin==='sentences'
-    ? 'Klocki zdań · '+stage.name
-    : stage.name + ' · ' + SECTIONS[currentSectionIndex].name;
+  $('#playSectionName').textContent =
+    sessionOrigin==='pool' ? ('Pula: '+activePoolName) :
+    sessionOrigin==='sentences' ? ('Klocki zdań · '+stage.name) :
+    (stage.name + ' · ' + SECTIONS[currentSectionIndex].name);
   show('play');
   nextStep();
 }
@@ -2977,7 +2991,16 @@ async function loadPools(){
       del.type='button';
       del.addEventListener('click',async ()=>{
         if(!confirm('Usunąć pulę „'+poolItem.name+'”?'))return;
-        try{ await api('/api/pools/'+poolItem.id,{method:'DELETE'}); loadPools(); }
+        try{
+          await api('/api/pools/'+poolItem.id,{method:'DELETE'});
+          // Usuwamy też postęp tej puli ze stanu, żeby nie zostawał sierotą.
+          if(S.poolCards){
+            const prefix='pool:'+poolItem.id+':';
+            Object.keys(S.poolCards).forEach(key=>{ if(key.indexOf(prefix)===0) delete S.poolCards[key]; });
+            saveProgress();
+          }
+          loadPools();
+        }
         catch(problem){ toast('Nie udało się usunąć.'); }
       });
       actions.append(learn,del);
@@ -3045,7 +3068,13 @@ function renderPoolIntro(stage,item){
   hear.addEventListener('click',()=>say(card.en));
   box.append(hear); stage.append(box);
   const next=make('button','next','Dodaję do nauki'); next.type='button';
-  next.addEventListener('click',()=>{ if(!poolSeen(card.id)) gradePool(card.id,true); saveProgress(); nextStep(); });
+  next.addEventListener('click',()=>{
+    // Samo pokazanie słowa to nie odtworzenie z pamięci: tworzymy kartę
+    // jako widzianą, ale z zerowym postępem, żeby weszła do powtórek.
+    if(!S.poolCards) S.poolCards={};
+    if(!poolSeen(card.id)) S.poolCards[card.id]={i:0,e:2.2,d:Date.now(),r:0,ok:0,bad:0};
+    saveProgress(); nextStep();
+  });
   stage.append(next);
   setTimeout(()=>say(card.en),250);
 }
@@ -3078,7 +3107,9 @@ function renderPoolType(stage,item){
       gradePool(card.id,attempts===0); if(attempts===0)hits++; done++; saveProgress(); say(card.en);
       clearTimeout(advanceTimer);advanceTimer=setTimeout(nextStep,800);return;
     }
-    attempts++; gradePool(card.id,false); fb.className='fb bad';
+    // Karę za błąd stosujemy RAZ, przy pierwszej pomyłce, nie przy każdej próbie.
+    if(attempts===0) gradePool(card.id,false);
+    attempts++; fb.className='fb bad';
     fb.textContent=attempts>=2?('Podpowiedź: zaczyna się od „'+card.en.slice(0,2)+'”'):'Jeszcze nie. Posłuchaj podpowiedzi.';
     say(card.en);
     if(attempts>=3){ fb.textContent='Poprawnie: '+card.en; input.disabled=true;go.disabled=true;done++;clearTimeout(advanceTimer);advanceTimer=setTimeout(nextStep,1600); }

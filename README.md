@@ -1,4 +1,4 @@
-# Swift-bird — wersja 11.15
+# Swift-bird — wersja 12.0
 
 Szkolna aplikacja internetowa do nauki angielskich słów i budowania zdań. Uczniowie logują się
 bez adresu e-mail: imieniem, pierwszą literą nazwiska i indywidualnym
@@ -112,10 +112,18 @@ Po wdrożeniu otwórz `/`, wybierz **Panel administratora**, zaloguj się hasłe
 
 ## Moduły
 
-Aplikacja realizuje pięć poziomów taksonomii Blooma, zgodnie z układem
-wymagań edukacyjnych dla klasy 4. Poziom szósty (tworzenie i ewaluacja)
-jest świadomie odłożony, bo ocena swobodnych tekstów dziecka wymaga modelu
-językowego albo przeglądu przez nauczyciela.
+Aplikacja realizuje cztery z sześciu poziomów zrewidowanej taksonomii Blooma:
+zapamiętanie (słówka), rozumienie (zdania, historyjki), zastosowanie (dialogi)
+i analiza (Detektyw). Dwa najwyższe poziomy są ODDZIELNE i oba wciąż przed nami:
+EWALUACJA (wybór najlepszego sformułowania z uzasadnieniem) oraz TWORZENIE
+(samodzielna wypowiedź, tekst, dialog). Wcześniejsze wersje tej dokumentacji
+błędnie łączyły je w jeden poziom — w zrewidowanej taksonomii to dwa osobne
+szczeble.
+
+Osobna uwaga: Bloom opisuje GŁĘBOKOŚĆ poznawczą zadania, a nie POZIOM JĘZYKOWY.
+Poziom językowy (CEFR: A1–B2) to druga, niezależna oś. Docelowo każde zadanie
+ma nieść oba tagi: poziom CEFR i poziom Blooma. Ten fundament dwóch osi jest
+w budowie (Swift-bird 12.1).
 
 | Moduł | Poziom | Plik z treścią | Na czym polega |
 |---|---|---|---|

@@ -52,7 +52,7 @@
       </form>
       <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
       <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
-      <p class="version-label">Wersja 11.20</p>
+      <p class="version-label">Wersja 12.0</p>
     </div>
   </section>
 
@@ -107,7 +107,7 @@
         <p id="adminLoginError" class="form-error" role="alert"></p>
         <button class="primary" type="submit">Zaloguj się</button>
       </form>
-      <p class="version-label">Wersja 11.20</p>
+      <p class="version-label">Wersja 12.0</p>
     </div>
   </section>
 
@@ -125,21 +125,25 @@
         <div><p class="eyebrow" id="trackLabel">Ścieżka: Szkoła</p><h1 id="welcomeName">Cześć!</h1></div>
         <div class="streak"><b id="streakN">0</b><small>dni z rzędu</small></div>
       </section>
-      <section class="overview" aria-label="Postępy">
+      <section class="overview track-school-only" aria-label="Postępy">
         <div><b id="allCollected">0</b><span>z 500 słów</span></div>
         <div><b id="passedN">0</b><span>zdanych egzaminów</span></div>
         <div><b id="openN">1</b><span>otwartych sekcji</span></div>
         <div><b id="featherN">0</b><span>piórka</span></div>
         <div><b id="badgeN">0</b><span>z 7 odznak</span></div>
       </section>
+      <section class="world-intro track-world-only">
+        <h2>Ścieżka Świat</h2>
+        <p>Uczysz się z własnych zestawów słówek: biznes, praca, podróże, cokolwiek wkleisz. Pełny program dla dorosłych, z czasami i poziomami CEFR, jest w budowie.</p>
+      </section>
       <section class="home-actions">
         <button id="openMap" class="secondary wide track-school-only" type="button">🗺️ Mapa wyprawy Jerzyka</button>
         <button id="openPools" class="secondary wide" type="button">📚 Moje pule słówek</button>
         <button id="trackToggle" class="text-button" type="button">Przełącz na Świat</button>
-        <p class="journey-home-copy">Każdy zdany egzamin przesuwa Jerzyka do kolejnego miejsca. Piórka zdobywasz za trudne, dobrze wykonane zadania.</p>
+        <p class="journey-home-copy track-school-only">Każdy zdany egzamin przesuwa Jerzyka do kolejnego miejsca. Piórka zdobywasz za trudne, dobrze wykonane zadania.</p>
         <p id="challengeLine" class="done-challenge"></p>
       </section>
-      <section class="learning-modules" aria-label="Moduły nauki">
+      <section class="learning-modules track-school-only" aria-label="Moduły nauki">
         <section id="vocabularyLaunch" class="module-launch vocabulary-launch" aria-labelledby="vocabularyLaunchTitle">
           <div class="module-launch-icon" aria-hidden="true">📚</div>
           <div class="module-launch-copy">
@@ -161,7 +165,7 @@
           <button id="openSentences" class="primary" type="button">Ćwicz zdania</button>
         </section>
       </section>
-      <section class="home-badges" aria-labelledby="homeBadgesTitle">
+      <section class="home-badges track-school-only" aria-labelledby="homeBadgesTitle">
         <div class="home-badges-head">
           <div><p class="eyebrow">Twoje osiągnięcia</p><h2 id="homeBadgesTitle">Odznaki Jerzyka</h2></div>
           <strong id="homeBadgeCount">0 z 7 zdobytych</strong>

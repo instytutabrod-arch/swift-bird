@@ -125,3 +125,47 @@ test('serwer zapisuje postęp pul osobno od słów głównych', () => {
   // kształtu — istotne jest, że gałąź poolCards w ogóle istnieje i jest ograniczona.
   assert.equal(clean.poolCards['pool:abc:invoice'].ok, 2);
 });
+
+test('naprawy 11.20: intro nie zawyża, wpisywanie nie karze podwójnie, usuwanie czyści postęp', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+
+  // Intro tworzy kartę jako widzianą z zerowym postępem, nie jako poprawną odpowiedź.
+  const intro = app.slice(app.indexOf('function renderPoolIntro'), app.indexOf('function renderPoolType'));
+  assert.doesNotMatch(intro, /gradePool\(card\.id,true\)/, 'intro nie może liczyć poprawnej odpowiedzi');
+  assert.match(intro, /r:0,ok:0,bad:0/, 'intro inicjuje kartę z zerowym postępem');
+
+  // Wpisywanie karze za błąd tylko raz.
+  const type = app.slice(app.indexOf('function renderPoolType'), app.indexOf('function renderPoolPick'));
+  assert.match(type, /if\(attempts===0\) gradePool\(card\.id,false\)/, 'kara za błąd tylko przy pierwszej próbie');
+
+  // Usunięcie puli czyści jej postęp ze stanu.
+  assert.match(app, /Object\.keys\(S\.poolCards\)\.forEach\(key=>\{ if\(key\.indexOf\(prefix\)===0\) delete S\.poolCards\[key\]/,
+    'usuwanie puli musi czyścić jej postęp');
+});
+
+test('naprawy 11.20: generator używa słów z pul tylko gdy pasują rolą', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  const vocab = app.slice(app.indexOf('function collectedVocabulary'), app.indexOf("function collectedVocabulary") + 1200);
+  // Słowa z pul przechodzą przez filtr ról, nie wpadają na ślepo.
+  assert.match(vocab, /roleWords\.has\(en\)/, 'słowa z pul muszą przejść filtr ról semantycznych');
+});
+
+test('naprawy 11.20: tryb Świat ukrywa szkolną narrację', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+  // Statystyki i moduły szkolne oznaczone jako tylko-Szkoła.
+  assert.match(html, /class="overview track-school-only"/, 'statystyki 500 słów tylko w Szkole');
+  assert.match(html, /class="learning-modules track-school-only"/, 'moduły szkolne tylko w Szkole');
+  assert.match(html, /class="world-intro track-world-only"/, 'blok Świata istnieje');
+  assert.match(css, /body\.track-school \.track-world-only\{display:none\}/, 'blok Świata ukryty w Szkole');
+});
+
+test('wersje są zsynchronizowane', () => {
+  const root = path.join(__dirname, '..');
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  assert.equal(lock.version, pkg.version, 'package-lock musi mieć tę samą wersję co package.json');
+  const appVersion = (app.match(/APP_VERSION = '([^']+)'/) || [])[1];
+  assert.equal(appVersion, pkg.version.split('.').slice(0,2).join('.'), 'APP_VERSION musi zgadzać się z package.json');
+});
