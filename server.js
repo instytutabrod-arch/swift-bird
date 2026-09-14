@@ -233,7 +233,7 @@ function sanitizeDoneMap(raw,limit){
 function sanitizeProgress(input){
   const raw=input&&typeof input==='object'?input:{};
   const state={schema:3,cards:{},streak:0,lastDay:null,sessions:0,passedExams:[],
-    patterns:{},errorCards:{},stories:{},dialogues:{},
+    patterns:{},errorCards:{},stories:{},dialogues:{},poolCards:{},
     mistakes:[],feathers:0,badges:[],stages:0};
   state.streak=clampCount(raw.streak,10000);
   state.sessions=clampCount(raw.sessions,100000);
@@ -243,6 +243,8 @@ function sanitizeProgress(input){
   state.cards=sanitizeCardMap(raw.cards,500);
   state.patterns=sanitizeCardMap(raw.patterns,200);
   state.errorCards=sanitizeCardMap(raw.errorCards,200);
+  // Postęp nauki z pul, osobno od 500 słów głównych. Klucz to pool:<id>:<en>.
+  state.poolCards=sanitizeCardMap(raw.poolCards,2000);
   state.stories=sanitizeDoneMap(raw.stories,100);
   state.dialogues=sanitizeDoneMap(raw.dialogues,100);
   const passed=Array.isArray(raw.passedExams)?raw.passedExams:[];

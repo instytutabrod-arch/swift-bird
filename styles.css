@@ -388,3 +388,8 @@ body.track-world .track-school-only{display:none}
 .pool-card-meta{font-size:.8rem;color:var(--muted)}
 .pool-delete{background:transparent;border:1px solid #6b1a30;color:#ff9db5;border-radius:8px;padding:7px 13px;font-size:.85rem;cursor:pointer}
 .pool-delete:active{background:#3a1420}
+
+.pool-card-actions{display:flex;gap:8px;flex:0 0 auto}
+.pool-learn{background:var(--green);color:#08301f;border:0;border-radius:8px;padding:7px 15px;font-family:var(--display);font-weight:700;font-size:.88rem;cursor:pointer}
+.pool-learn:disabled{opacity:.4;cursor:default}
+.pool-learn:active{transform:translateY(1px)}

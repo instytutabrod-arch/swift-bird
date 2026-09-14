@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '11.18';
+const APP_VERSION = '11.20';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -212,7 +212,7 @@ let syncRevision = 0;
 
 function emptyState(){
   return {schema:3,cards:{},streak:0,lastDay:null,sessions:0,passedExams:[],
-    patterns:{},errorCards:{},stories:{},dialogues:{},
+    patterns:{},errorCards:{},stories:{},dialogues:{},poolCards:{},
     mistakes:[],feathers:0,badges:[],stages:0};
 }
 
@@ -278,6 +278,19 @@ function normalizeState(raw){
   state.mistakes = (Array.isArray(raw.mistakes)?raw.mistakes.slice(-60):[])
     .filter(item=>item && typeof item === 'object')
     .map(item=>({kind:String(item.kind||''),ref:String(item.ref||''),at:Math.max(0,Number(item.at)||0)}));
+  // Postęp pul ma otwarty zbiór kluczy (pool:<id>:<słowo>), więc akceptujemy
+  // każdy klucz z tym prefiksem zamiast listy dozwolonych.
+  state.poolCards = {};
+  if(raw.poolCards && typeof raw.poolCards === 'object'){
+    Object.entries(raw.poolCards).slice(0,2000).forEach(([id,value]) => {
+      if(!/^pool:/.test(id) || !value || typeof value !== 'object') return;
+      state.poolCards[id] = {
+        i:clampInt(value.i,0,365), e:Math.max(1.3,Math.min(2.6,Number(value.e)||2.2)),
+        d:Math.max(0,Number(value.d)||0), r:clampInt(value.r,0,10000),
+        ok:clampInt(value.ok,0,100000), bad:clampInt(value.bad,0,100000)
+      };
+    });
+  }
   return state;
 }
 
@@ -838,8 +851,39 @@ function startLearning(){
 
 let stagePlan = [], stageIndex = 0, stageStartedAt = 0, shortSession = false;
 let sessionOrigin = 'section', focusedPatternId = '';
+/* Sesja puli. Karty puli żyją tylko w pamięci na czas sesji; ich postęp
+   trzymamy w S.poolCards pod kluczem 'pool:<poolId>:<en>', osobno od 500
+   słów głównych, żeby jedno nie zaburzało drugiego. */
+let poolCards = [], activePoolId = '', activePoolName = '';
 
 function wordQueue(){ return startLearning(); }
+
+/* Kolejka nauki puli. Ten sam zestaw trybów co przy słowach głównych,
+   ale karty pochodzą z wybranej puli, a postęp siedzi w S.poolCards. */
+function poolSeen(id){ return Boolean((S.poolCards||{})[id]); }
+function poolDue(id){ const c=(S.poolCards||{})[id]; return !c || c.d<=Date.now(); }
+function poolQueue(){
+  if(!S.poolCards) S.poolCards={};
+  const fresh=shuffle(poolCards.filter(c=>!poolSeen(c.id))).slice(0,NEW_PER_SESSION);
+  const due=shuffle(poolCards.filter(c=>poolSeen(c.id)&&poolDue(c.id))).slice(0,MAX_SESSION_ITEMS-fresh.length*2);
+  const q=[];
+  fresh.forEach(card=>q.push({card,mode:'pool-intro'},{card,mode:'pool-type'}));
+  due.forEach(card=>{
+    const reps=(S.poolCards[card.id]||{}).r||0;
+    const modes=reps>=1?['pool-type','pool-type','pool-pick']:['pool-type','pool-pick'];
+    q.push({card,mode:modes[Math.floor(Math.random()*modes.length)]});
+  });
+  if(!q.length) shuffle(poolCards).slice(0,10).forEach(card=>q.push({card,mode:'pool-type'}));
+  return q;
+}
+function gradePool(id,correct){
+  if(!S.poolCards) S.poolCards={};
+  const card=S.poolCards[id]||(S.poolCards[id]={i:0,e:2.2,d:0,r:0,ok:0,bad:0});
+  if(correct){ card.ok++;card.r++;card.e=Math.min(2.6,card.e+0.05);
+    card.i=Math.round(STEPS[Math.min(card.r-1,STEPS.length-1)]*(card.e/2.2));card.d=Date.now()+card.i*DAY; }
+  else{ card.bad++;card.r=Math.max(0,card.r-2);card.e=Math.max(1.3,card.e-0.15);card.i=0;card.d=Date.now(); }
+  return card;
+}
 
 function patternQueue(limit){
   const unlockedIds=new Set(PATTERN_LIST.filter((pattern,index)=>patternUnlocked(index)).map(pattern=>pattern.id));
@@ -899,6 +943,7 @@ function unlockedModules(){
    ćwiczenia daje lepsze wyniki w trakcie i gorsze po tygodniu. */
 function buildStage(id){
   const open = unlockedModules();
+  if(id === 'pool') return poolQueue();
   if(id === 'sentences') return focusedPatternQueue(focusedPatternId,6);
   if(id === 'warmup') return wordQueue();
   if(id === 'core'){
@@ -941,6 +986,21 @@ function beginPatternSession(patternId){
   const pattern=PATTERN_LIST[index];
   sessionOrigin='sentences';focusedPatternId=patternId;shortSession=false;
   stagePlan=[{id:'sentences',name:pattern.name,ms:10*60*1000,short:10*60*1000}];
+  stageIndex=0;done=0;hits=0;added=[];sessionRun++;startedAt=Date.now();dailyCounters={};
+  startStage();
+}
+
+function beginPoolSession(poolId,name,cards){
+  if(!cards||!cards.length){toast('Ta pula jest pusta.');return;}
+  activePoolId=poolId;activePoolName=name;
+  poolCards=cards.map((word,index)=>({
+    id:'pool:'+poolId+':'+String(word.en).toLowerCase(),
+    en:word.en, pl:word.pl,
+    ic:(word.icon&&word.icon!=='◻️')?word.icon:'◻️'
+  }));
+  sessionOrigin='pool';focusedPatternId='';shortSession=false;
+  const minutes=Math.min(15,Math.max(6,Math.ceil(poolCards.length*0.7)));
+  stagePlan=[{id:'pool',name:name,ms:minutes*60*1000,short:minutes*60*1000}];
   stageIndex=0;done=0;hits=0;added=[];sessionRun++;startedAt=Date.now();dailyCounters={};
   startStage();
 }
@@ -1025,6 +1085,9 @@ function nextStep(){
   if(item.mode==='error') return renderErrorHunt(stage,item.item);
   if(item.mode==='compare') return renderCompare(stage,item.item);
   if(item.mode==='ordering') return renderOrdering(stage,item.item);
+  if(item.mode==='pool-intro') return renderPoolIntro(stage,item);
+  if(item.mode==='pool-type') return renderPoolType(stage,item);
+  if(item.mode==='pool-pick') return renderPoolPick(stage,item);
   return renderChoice(stage,item);
 }
 
@@ -1140,16 +1203,18 @@ function finishLearning(){
   saveProgress();
 
   const sentenceSession=sessionOrigin==='sentences';
+  const poolSession=sessionOrigin==='pool';
   const count=sectionCollected(currentSectionIndex);
-  $('#dNew').textContent=sentenceSession?done:added.length;
+  const poolLearned=poolSession?poolCards.filter(c=>poolSeen(c.id)).length:0;
+  $('#dNew').textContent=poolSession?poolLearned:(sentenceSession?done:added.length);
   $('#dOk').textContent=hits;
-  $('#dSection').textContent=sentenceSession?totalLearnedSentences():count;
+  $('#dSection').textContent=poolSession?poolCards.length:(sentenceSession?totalLearnedSentences():count);
   $('#dFeathers').textContent = S.feathers || 0;
-  $('#dNewLabel').textContent=sentenceSession?'wykonanych zadań':'nowe słowa';
+  $('#dNewLabel').textContent=poolSession?'słów w nauce':(sentenceSession?'wykonanych zadań':'nowe słowa');
   $('#dOkLabel').textContent=sentenceSession?'bez błędu':'trafione';
-  $('#dSectionLabel').textContent=sentenceSession?'z 70 zdań poznanych':'z 20 zebranych';
-  $('#doneTitle').textContent=sentenceSession?'Zdania przećwiczone!':(added.length?'Kolekcja rośnie!':'Sesja zakończona!');
-  $('#doneBack').textContent=sentenceSession?'Wróć do klocków zdań':'Wróć do sekcji';
+  $('#dSectionLabel').textContent=poolSession?('słów w puli '+activePoolName):(sentenceSession?'z 70 zdań poznanych':'z 20 zebranych');
+  $('#doneTitle').textContent=poolSession?'Pula przećwiczona!':(sentenceSession?'Zdania przećwiczone!':(added.length?'Kolekcja rośnie!':'Sesja zakończona!'));
+  $('#doneBack').textContent=poolSession?'Wróć do pul':(sentenceSession?'Wróć do klocków zdań':'Wróć do sekcji');
 
   const list = $('#dList'); list.textContent = '';
   added.forEach(card => list.append(make('span','',card.ic+' '+card.en)));
@@ -1165,7 +1230,7 @@ function finishLearning(){
   }else note.textContent = '';
 
   const action = $('#doneAction'); action.textContent = '';
-  if(!sentenceSession&&count === 20 && !sectionPassed(currentSectionIndex)){
+  if(!sentenceSession&&!poolSession&&count === 20 && !sectionPassed(currentSectionIndex)){
     const button = make('button','primary wide','Zdaj egzamin'); button.type = 'button';
     button.addEventListener('click',()=>startExam(currentSectionIndex));
     action.append(button);
@@ -1398,8 +1463,8 @@ $('#vocabularyBack').addEventListener('click',()=>{renderHome();show('home');});
 $('#sectionBack').addEventListener('click',renderVocabularyHub);
 $('#openSentences').addEventListener('click',renderSentenceHub);
 $('#sentencesBack').addEventListener('click',()=>{renderHome();show('home');});
-$('#quit').addEventListener('click',()=>{sessionRun++;stopSpeech();clearTimeout(advanceTimer);if(sessionOrigin==='sentences')renderSentenceHub();else renderSection(currentSectionIndex);});
-$('#doneBack').addEventListener('click',()=>{if(sessionOrigin==='sentences')renderSentenceHub();else renderSection(currentSectionIndex);});
+$('#quit').addEventListener('click',()=>{sessionRun++;stopSpeech();clearTimeout(advanceTimer);if(sessionOrigin==='pool')openPools();else if(sessionOrigin==='sentences')renderSentenceHub();else renderSection(currentSectionIndex);});
+$('#doneBack').addEventListener('click',()=>{if(sessionOrigin==='pool')openPools();else if(sessionOrigin==='sentences')renderSentenceHub();else renderSection(currentSectionIndex);});
 $('#examQuit').addEventListener('click',()=>{stopSpeech();renderSection(currentSectionIndex);});
 $('#refreshStudents').addEventListener('click',renderStudents);
 $('#createStudent').addEventListener('submit',async event=>{
@@ -2903,6 +2968,11 @@ async function loadPools(){
       info.append(make('strong','',poolItem.name));
       info.append(make('span','pool-card-meta',poolItem.words+' słów'+(poolItem.createdBy==='teacher'?' · od nauczyciela':'')));
       card.append(info);
+      const actions=make('div','pool-card-actions');
+      const learn=make('button','pool-learn','Ucz się');
+      learn.type='button';
+      learn.disabled=poolItem.words===0;
+      learn.addEventListener('click',()=>startPoolLearning(poolItem));
       const del=make('button','pool-delete','Usuń');
       del.type='button';
       del.addEventListener('click',async ()=>{
@@ -2910,10 +2980,21 @@ async function loadPools(){
         try{ await api('/api/pools/'+poolItem.id,{method:'DELETE'}); loadPools(); }
         catch(problem){ toast('Nie udało się usunąć.'); }
       });
-      card.append(del);
+      actions.append(learn,del);
+      card.append(actions);
       listBox.append(card);
     });
   }catch(problem){ empty.hidden=false; empty.textContent='Nie udało się wczytać pul.'; }
+}
+
+async function startPoolLearning(poolItem){
+  if(inTestMode()){ toast('W trybie testowym pule nie są zapisywane.'); }
+  try{
+    const data=await api('/api/pools/'+poolItem.id);
+    const words=data.words||[];
+    if(!words.length){ toast('Ta pula jest pusta.'); return; }
+    beginPoolSession(poolItem.id,poolItem.name,words);
+  }catch(problem){ toast('Nie udało się wczytać puli.'); }
 }
 
 function openPools(){
@@ -2950,3 +3031,89 @@ if(poolCreateButton) poolCreateButton.addEventListener('click',async ()=>{
   }catch(problem){ error.textContent=problem.message||'Nie udało się utworzyć puli.'; }
   finally{ poolCreateButton.disabled=false; }
 });
+
+/* ==================== ZADANIA PULI ==================== */
+
+function renderPoolIntro(stage,item){
+  const card=item.card;
+  const box=make('div','card');
+  box.append(make('p','tag','Nowe słowo z puli: '+activePoolName));
+  if(card.ic&&card.ic!=='◻️') box.append(make('div','big',card.ic));
+  box.append(make('div','en',card.en));
+  box.append(make('div','pl',card.pl));
+  const hear=make('button','hear','Posłuchaj'); hear.type='button';
+  hear.addEventListener('click',()=>say(card.en));
+  box.append(hear); stage.append(box);
+  const next=make('button','next','Dodaję do nauki'); next.type='button';
+  next.addEventListener('click',()=>{ if(!poolSeen(card.id)) gradePool(card.id,true); saveProgress(); nextStep(); });
+  stage.append(next);
+  setTimeout(()=>say(card.en),250);
+}
+
+/* Wpisywanie z podpowiedziami. Podpowiedzi to inne słowa z tej samej puli. */
+function renderPoolType(stage,item){
+  const card=item.card;
+  const others=shuffle(poolCards.filter(c=>c.id!==card.id)).slice(0,3);
+  const options=shuffle([card,...others]);
+  const prompt=make('div','prompt');
+  prompt.append(make('p','ask','Wpisz po angielsku'));
+  if(card.ic&&card.ic!=='◻️') prompt.append(make('div','big',card.ic));
+  prompt.append(make('p','pattern-pl',card.pl));
+  stage.append(prompt);
+  const hints=make('div','hints');
+  options.forEach(o=>{ const b=make('button','hint',o.en); b.type='button'; b.setAttribute('aria-label','Odsłuchaj: '+o.en); b.addEventListener('click',()=>say(o.en)); hints.append(b); });
+  stage.append(hints);
+  const input=document.createElement('input');
+  input.type='text';input.className='inp';input.placeholder='wpisz tutaj';
+  input.autocapitalize='off';input.autocomplete='off';input.spellcheck=false;input.setAttribute('autocorrect','off');
+  stage.append(input);
+  const fb=make('p','fb',''); stage.append(fb);
+  const go=make('button','next','Sprawdź'); go.type='button'; stage.append(go);
+  let attempts=0;
+  function check(){
+    const v=input.value.trim().toLowerCase();
+    if(!v)return;
+    if(v===card.en.toLowerCase()){
+      fb.className='fb good';fb.textContent='Dobrze.';input.disabled=true;go.disabled=true;
+      gradePool(card.id,attempts===0); if(attempts===0)hits++; done++; saveProgress(); say(card.en);
+      clearTimeout(advanceTimer);advanceTimer=setTimeout(nextStep,800);return;
+    }
+    attempts++; gradePool(card.id,false); fb.className='fb bad';
+    fb.textContent=attempts>=2?('Podpowiedź: zaczyna się od „'+card.en.slice(0,2)+'”'):'Jeszcze nie. Posłuchaj podpowiedzi.';
+    say(card.en);
+    if(attempts>=3){ fb.textContent='Poprawnie: '+card.en; input.disabled=true;go.disabled=true;done++;clearTimeout(advanceTimer);advanceTimer=setTimeout(nextStep,1600); }
+  }
+  go.addEventListener('click',check);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();check();}});
+  setTimeout(()=>input.focus(),120);
+}
+
+/* Wybór: w Szkole obrazek→słowo, w Świecie polskie→angielskie. */
+function renderPoolPick(stage,item){
+  const card=item.card;
+  const world=currentTrack()==='world';
+  const others=shuffle(poolCards.filter(c=>c.id!==card.id)).slice(0,3);
+  const options=shuffle([card,...others]);
+  const prompt=make('div','prompt');
+  if(world||!card.ic||card.ic==='◻️'){
+    prompt.append(make('p','ask','Które słowo to znaczy?'));
+    prompt.append(make('p','pattern-pl',card.pl));
+  }else{
+    prompt.append(make('p','ask','Które słowo pasuje?'));
+    prompt.append(make('div','big',card.ic));
+  }
+  stage.append(prompt);
+  const opts=make('div','opts');
+  options.forEach(o=>{
+    const b=make('button','opt',o.en); b.type='button';
+    b.addEventListener('click',()=>{
+      [...opts.children].forEach(c=>c.disabled=true);
+      const ok=o.id===card.id; b.classList.add(ok?'right':'wrong');
+      if(!ok){ const right=[...opts.children].find(c=>c.textContent===card.en); if(right)right.classList.add('right'); }
+      gradePool(card.id,ok); if(ok)hits++; done++; saveProgress(); say(card.en);
+      clearTimeout(advanceTimer);advanceTimer=setTimeout(nextStep,ok?800:1500);
+    });
+    opts.append(b);
+  });
+  stage.append(opts);
+}

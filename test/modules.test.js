@@ -497,3 +497,21 @@ test('tryb testowy pozwala przełączać ścieżkę bez dotykania konta', () => 
   assert.match(app, /testTrack='school';/);
   assert.match(app, /function enterTestMode\(\)\{[\s\S]*?applyTrackToInterface\(\);/);
 });
+
+test('Dockerfile kopiuje wszystkie moduły wymagane przez serwer do /app', () => {
+  const root = path.join(__dirname, '..');
+  const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const dockerfile = fs.readFileSync(path.join(root, 'Dockerfile'), 'utf8');
+
+  // Lokalne require('./x') w serwerze wymagają, by plik x.js leżał obok
+  // server.js w obrazie, czyli był kopiowany do /app (nie tylko do /public).
+  const required = [...server.matchAll(/require\('\.\/([a-z0-9-]+)'\)/g)].map(m => m[1] + '.js');
+  // Linie COPY, które trafiają do /app (kończą się na ./ albo ./nazwę, nie ./public/).
+  const appCopies = dockerfile.split('\n')
+    .filter(line => line.trim().startsWith('COPY') && !line.includes('./public/'))
+    .join(' ');
+  required.forEach(file => {
+    assert.ok(appCopies.includes(file),
+      'Dockerfile nie kopiuje ' + file + ' do /app, a serwer robi require na nim — kontener nie wstanie');
+  });
+});

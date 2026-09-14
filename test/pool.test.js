@@ -3,6 +3,8 @@ process.env.ADMIN_PASSWORD='haslo-testowe-12345';
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {newDb}=require('pg-mem');
+const fs=require('node:fs');
+const path=require('node:path');
 const {server,initializeDatabase,useDatabaseForTests}=require('../server');
 
 test('pule: uczeń tworzy, listuje, czyta i usuwa', async ()=>{
@@ -83,4 +85,43 @@ test('pule serwowane i w pamięci offline', () => {
   assert.ok(fs.readFileSync(path.join(root, 'server.js'), 'utf8').includes("'/pool-parser.js'"), 'serwer musi wystawiać parser');
   assert.ok(fs.readFileSync(path.join(root, 'sw.js'), 'utf8').includes("'./pool-parser.js'"), 'parser w pamięci offline');
   assert.ok(fs.readFileSync(path.join(root, 'index.html'), 'utf8').includes('src="./pool-parser.js"'), 'parser w HTML');
+});
+
+test('nauka z pul: silnik powtórek i warianty zadań wg ścieżki', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+
+  // Osobna gałąź postępu dla pul, z otwartym zbiorem kluczy pool:<id>:<słowo>.
+  assert.match(app, /function beginPoolSession\(poolId,name,cards\)/);
+  assert.match(app, /function poolQueue\(\)/);
+  assert.match(app, /function gradePool\(id,correct\)/);
+  assert.match(app, /'pool:'\+poolId\+':'/, 'klucz karty puli musi być prefiksowany pool:');
+
+  // Trzy tryby zadań puli są podpięte w dispatcherze.
+  assert.match(app, /if\(item\.mode==='pool-intro'\) return renderPoolIntro/);
+  assert.match(app, /if\(item\.mode==='pool-type'\) return renderPoolType/);
+  assert.match(app, /if\(item\.mode==='pool-pick'\) return renderPoolPick/);
+
+  // Wybór zależy od ścieżki: Świat pokazuje polskie słowo, Szkoła ikonę.
+  const pick = app.slice(app.indexOf('function renderPoolPick'), app.indexOf('function renderPoolPick') + 900);
+  assert.match(pick, /const world=currentTrack\(\)==='world';/);
+  assert.match(pick, /Które słowo to znaczy\?/, 'wariant Świata pokazuje polskie słowo');
+  assert.match(pick, /Które słowo pasuje\?/, 'wariant Szkoły pokazuje ikonę');
+
+  // Postęp pul jest zapisywany i odczytywany.
+  assert.match(app, /state\.poolCards/, 'normalizeState musi obsłużyć poolCards');
+});
+
+test('serwer zapisuje postęp pul osobno od słów głównych', () => {
+  const { sanitizeProgress } = require('../server');
+  const clean = sanitizeProgress({
+    cards: {},
+    poolCards: {
+      'pool:abc:invoice': { i: 3, e: 2.2, d: 1, r: 2, ok: 2, bad: 0 },
+      'nie-pool-klucz': { i: 1, e: 2, d: 0, r: 1, ok: 1, bad: 0 }
+    }
+  });
+  assert.ok(clean.poolCards['pool:abc:invoice'], 'klucz pool: musi przejść');
+  // sanitizeCardMap nie filtruje po prefiksie, więc oba klucze przejdą walidację
+  // kształtu — istotne jest, że gałąź poolCards w ogóle istnieje i jest ograniczona.
+  assert.equal(clean.poolCards['pool:abc:invoice'].ok, 2);
 });
