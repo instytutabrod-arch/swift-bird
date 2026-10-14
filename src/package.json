@@ -1,0 +1,20 @@
+{
+  "name": "swift-bird",
+  "version": "16.4.0",
+  "private": true,
+  "description": "Nauka angielskiego dla dzieci i dorosłych z orientacyjnym poziomowaniem CEFR i zadaniami Blooma",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "pg-mem": "^3.0.5"
+  }
+}

@@ -1,0 +1,128 @@
+'use strict';
+
+process.env.ADMIN_PASSWORD='bezpieczne-haslo-testowe';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {newDb}=require('pg-mem');
+const {
+  server,initializeDatabase,useDatabaseForTests,
+  normalizeName,cleanFirstName,cleanInitial,validFirstName,validInitial,validPin,
+  sanitizeProgress,hashSecret,verifySecret,safeEqual
+}=require('../server');
+
+test('schemat PostgreSQL tworzy wszystkie tabele aplikacji', async () => {
+  const memory=newDb();
+  const adapter=memory.adapters.createPg();
+  const database=new adapter.Pool();
+  await initializeDatabase(database);
+  const result=await database.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name");
+  assert.deepEqual(result.rows.map(row=>row.table_name),['learner_models','learning_events','pool_words','sessions','student_progress','students','word_pools']);
+  await database.end();
+});
+
+test('pełny przepływ API: administrator, konto ucznia i postęp', async () => {
+  const memory=newDb();
+  const adapter=memory.adapters.createPg();
+  const database=new adapter.Pool();
+  await initializeDatabase(database);useDatabaseForTests(database);
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const address=server.address();const base='http://127.0.0.1:'+address.port;
+  const post=(path,body,cookie)=>fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},body:JSON.stringify(body)});
+  try{
+    const health=await fetch(base+'/api/health');assert.equal(health.status,200);
+    assert.equal(health.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
+    assert.match(health.headers.get('content-security-policy'),/img-src[^;]*https:\/\/tile\.openstreetmap\.org/);
+
+    const adminLogin=await post('/api/admin/login',{password:'bezpieczne-haslo-testowe'});
+    assert.equal(adminLogin.status,200);const adminCookie=adminLogin.headers.get('set-cookie').split(';')[0];
+
+    const createdResponse=await post('/api/admin/students',{firstName:'Maja',lastInitial:'K',track:'world'},adminCookie);
+    assert.equal(createdResponse.status,201);const created=(await createdResponse.json()).student;
+    assert.match(created.pin,/^\d{4}$/);
+
+    const studentLogin=await post('/api/student/login',{firstName:'maja',lastInitial:'k',pin:created.pin});
+    assert.equal(studentLogin.status,200);assert.equal((await studentLogin.clone().json()).user.track,'world');const studentCookie=studentLogin.headers.get('set-cookie').split(';')[0];
+
+    const saved=await fetch(base+'/api/progress',{method:'PUT',headers:{'Content-Type':'application/json',Cookie:studentCookie},body:JSON.stringify({state:{cards:{'animals-home:cat':{i:1,e:2.2,d:1,r:1,ok:1,bad:0}},patterns:{'to-be-positive#0':{i:1,e:2.2,d:1,r:1,ok:1,bad:0}},passedExams:[],cefr:{level:'C2',unlockedLevel:'C2',confidence:'średnia',correct:18,answered:20,evaluations:{C1:{passed:true,correct:7,total:8,completedAt:'2026-09-16T12:00:00.000Z'},C2:{passed:true,correct:6,total:8,completedAt:'2026-09-16T12:10:00.000Z'}},goals:[],history:[{level:'C2',confidence:'średnia',correct:18,answered:20,completedAt:'2026-09-16T12:00:00.000Z'}]}}})});
+    assert.equal(saved.status,200);
+    const progress=await fetch(base+'/api/progress',{headers:{Cookie:studentCookie}});assert.equal(progress.status,200);
+    const progressState=(await progress.json()).state;
+    assert.ok(progressState.cards['animals-home:cat']);
+    assert.equal(progressState.cefr.level,'C2');
+    assert.equal(progressState.cefr.unlockedLevel,'C2');
+    assert.equal(progressState.cefr.evaluations.C1.passed,true);
+    assert.equal(progressState.cefr.evaluations.C2.correct,6);
+
+    const list=await fetch(base+'/api/admin/students',{headers:{Cookie:adminCookie}});assert.equal(list.status,200);
+    const students=(await list.json()).students;assert.equal(students.length,1);assert.equal(students[0].displayName,'Maja K.');assert.equal(students[0].track,'world');assert.equal(students[0].cefrLevel,'C2');assert.equal(students[0].wordsCollected,1);assert.equal(students[0].sentencesCompleted,1);
+
+    const reset=await post('/api/admin/students/'+created.id+'/reset-pin',{},adminCookie);
+    assert.equal(reset.status,200);const newPin=(await reset.json()).student.pin;assert.match(newPin,/^\d{4}$/);
+    const expiredSession=await fetch(base+'/api/progress',{headers:{Cookie:studentCookie}});assert.equal(expiredSession.status,401);
+    const oldLogin=await post('/api/student/login',{firstName:'Maja',lastInitial:'K',pin:created.pin});assert.equal(oldLogin.status,401);
+    const newLogin=await post('/api/student/login',{firstName:'Maja',lastInitial:'K',pin:newPin});assert.equal(newLogin.status,200);
+  }finally{
+    await new Promise(resolve=>server.close(resolve));await database.end();
+  }
+});
+
+test('dane logowania ucznia są czyszczone i sprawdzane', () => {
+  assert.equal(cleanFirstName('  Żaneta   Maria '),'Żaneta Maria');
+  assert.equal(normalizeName('  ŻANETA   Maria '),'żaneta maria');
+  assert.equal(cleanInitial(' źródło '),'Ź');
+  assert.equal(validFirstName("Anne-Marie"),true);
+  assert.equal(validFirstName(''),false);
+  assert.equal(validInitial('Ł'),true);
+  assert.equal(validPin('1234'),true);
+  assert.equal(validPin('12345'),false);
+});
+
+test('PIN jest haszowany i można go bezpiecznie sprawdzić', async () => {
+  const encoded=await hashSecret('4829');
+  assert.notEqual(encoded,'4829');
+  assert.equal(await verifySecret('4829',encoded),true);
+  assert.equal(await verifySecret('4830',encoded),false);
+  assert.equal(safeEqual('sekret','sekret'),true);
+  assert.equal(safeEqual('sekret','inny'),false);
+});
+
+test('postęp z żądania jest ograniczony do bezpiecznego formatu', () => {
+  const state=sanitizeProgress({
+    streak:-8,sessions:4.4,lastDay:'2026-09-09-extra',
+    cards:{'animals-home:cat':{i:999,e:99,d:-2,r:-1,ok:3,bad:2}},
+    passedExams:['animals-home','nie-istnieje']
+  });
+  assert.equal(state.streak,0);
+  assert.equal(state.sessions,4);
+  assert.equal(state.lastDay,'2026-09-09');
+  assert.deepEqual(state.passedExams,['animals-home']);
+  assert.equal(state.cards['animals-home:cat'].i,365);
+  assert.equal(state.cards['animals-home:cat'].e,2.6);
+  assert.equal(state.cards['animals-home:cat'].d,0);
+  assert.equal(state.schema,4);
+  assert.equal(state.cefr.unlockedLevel,'A1');
+});
+
+test('pełny postęp 2000 własnych słów mieści się w dozwolonym modelu',()=>{
+  const poolCards={};
+  for(let index=0;index<2000;index++)poolCards['pool:x:word-'+index]={i:1,e:2.2,d:1,r:1,ok:1,bad:0};
+  const state=sanitizeProgress({poolCards,cefr:{level:'A2',unlockedLevel:'B1',confidence:'średnia',goals:['past-simple']},bloom:{'past-simple':{evaluate:1,create:1,spoken:1,reflection:'wzór budowy'}}});
+  assert.equal(Object.keys(state.poolCards).length,2000);
+  assert.equal(state.cefr.level,'A2');
+  assert.equal(state.cefr.unlockedLevel,'B1');
+  assert.equal(state.bloom['past-simple'].spoken,1);
+  assert.ok(Buffer.byteLength(JSON.stringify({state}))<512*1024);
+});
+
+test('sanityzacja zachowuje pełny zakres CEFR A1-C2',()=>{
+  const state=sanitizeProgress({cefr:{
+    level:'C2',unlockedLevel:'C2',confidence:'wysoka',correct:20,answered:20,
+    evaluations:{C1:{passed:true,correct:8,total:8},C2:{passed:true,correct:7,total:8}},
+    history:[{level:'C1',confidence:'średnia',correct:16,answered:20},{level:'C2',confidence:'wysoka',correct:20,answered:20}]
+  }});
+  assert.equal(state.cefr.level,'C2');
+  assert.equal(state.cefr.unlockedLevel,'C2');
+  assert.deepEqual(Object.keys(state.cefr.evaluations).sort(),['C1','C2']);
+  assert.deepEqual(state.cefr.history.map(item=>item.level),['C1','C2']);
+});

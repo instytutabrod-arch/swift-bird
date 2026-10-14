@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#F6F8FB">
+  <meta name="description" content="LingLing – nauka angielskiego dla dzieci i dorosłych: słowa, zdania, gramatyka i orientacyjny poziom CEFR.">
+  <title>LingLing</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <!-- Czcionki hostowane lokalnie w ./fonts (offline-first), deklaracje @font-face w styles.css -->
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header id="studentChrome" class="student-chrome" hidden>
+    <button id="chromeHome" class="chrome-brand" type="button" aria-label="Strona główna LingLing">
+      <svg class="bird" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50,19 C52.6,25 53.6,33 53.0,43 L55.4,71 L50,63 L44.6,71 L47.0,43 C46.4,33 47.4,25 50,19 Z" fill="currentColor"/><path d="M48.2,36 C36,37 20.5,44 8,63 C21,50.5 35,44.5 49.2,44.8 Z" fill="currentColor"/><path d="M51.8,36 C64,37 79.5,44 92,63 C79,50.5 65,44.5 50.8,44.8 Z" fill="currentColor"/></svg>
+      <strong>LingLing</strong>
+    </button>
+    <button id="chromeMenuToggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="studentRail" aria-label="Menu nawigacji">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+    </button>
+    <button id="chromeProfile" class="chrome-profile" type="button" aria-haspopup="dialog" aria-controls="quickProfile">
+      <span id="chromeAvatar" class="chrome-avatar" aria-hidden="true">U</span>
+      <span class="chrome-profile-text"><span id="chromeName" class="chrome-name">Uczeń</span><small id="chromeTrack" class="chrome-track">Uczeń</small></span>
+    </button>
+  </header>
+
+  <nav id="studentRail" class="student-rail" aria-label="Główna nawigacja ucznia" hidden>
+    <button id="railToggle" class="rail-toggle" type="button" aria-expanded="true" aria-label="Zwiń nawigację"><span aria-hidden="true">☰</span></button>
+    <div class="rail-items">
+      <button id="homeNavToday" class="rail-button active" type="button" data-rail-tab="today" aria-controls="homeToday" aria-current="page"><span class="rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-6h4v6"/></svg></span><span class="rail-label">Dzisiaj</span></button>
+      <button id="homeNavLearn" class="rail-button" type="button" data-rail-tab="learn" aria-controls="homeLearn"><span class="rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></span><span class="rail-label">Nauka</span></button>
+      <button id="homeNavProgress" class="rail-button" type="button" data-rail-tab="progress" aria-controls="homeProgress"><span class="rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg></span><span class="rail-label">Postęp</span></button>
+      <button id="homeNavProfile" class="rail-button" type="button" data-rail-tab="profile" aria-controls="homeProfile"><span class="rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span class="rail-label">Profil</span></button>
+    </div>
+  </nav>
+
+  <div id="quickProfile" class="quick-profile" hidden role="dialog" aria-modal="true" aria-labelledby="quickProfileTitle">
+    <div class="quick-profile-card">
+      <h2 id="quickProfileTitle">Szybkie ustawienia</h2>
+      <p id="quickProfileName" class="quick-profile-name"></p>
+      <button id="quickProfileTrack" class="secondary wide" type="button">Przełącz ścieżkę</button>
+      <button id="quickProfileFull" class="secondary wide" type="button">Pełny profil</button>
+      <button id="quickProfileLogout" class="secondary wide" type="button">Wyloguj</button>
+      <button id="quickProfileClose" class="text-button" type="button">Zamknij</button>
+    </div>
+  </div>
+
+  <div id="badgeModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="badgeName">
+    <div class="modal-card">
+      <p class="modal-eyebrow">Nowa odznaka</p>
+      <div id="badgeBigIcon" class="modal-icon"></div>
+      <h2 id="badgeName">Odznaka</h2>
+      <p id="badgeDesc" class="modal-desc"></p>
+      <p id="badgeReward" class="modal-reward"></p>
+      <div id="badgeStory" class="modal-story" hidden></div>
+      <button id="badgeStoryButton" class="primary wide" type="button">Przeczytaj historyjkę</button>
+      <button id="badgeRewardButton" class="secondary wide" type="button">Zobacz nagrodę</button>
+      <button id="badgeClose" class="text-button" type="button">Zamknij</button>
+      <p id="badgeQueueNote" class="modal-queue"></p>
+    </div>
+  </div>
+
+  <div id="testBanner" hidden>TRYB TESTOWY · postęp nie jest zapisywany <button id="leaveTestMode" type="button">Wróć do panelu</button></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <button id="learningHelpButton" class="learning-help-button" type="button" hidden aria-expanded="false" aria-controls="learningHelpLayer"><span aria-hidden="true">?</span><strong>Pomoc</strong></button>
+  <div id="learningHelpLayer" class="learning-help-layer" hidden>
+    <button id="learningHelpScrim" class="learning-help-scrim" type="button" aria-label="Zamknij pomoc"></button>
+    <aside class="learning-help-drawer" role="dialog" aria-modal="true" aria-labelledby="learningHelpTitle">
+      <div class="learning-help-head"><div><p class="eyebrow">Pomoc w tym miejscu</p><h2 id="learningHelpTitle">Jak mogę pomóc?</h2></div><button id="learningHelpClose" class="learning-help-close" type="button" aria-label="Zamknij pomoc">×</button></div>
+      <p id="learningHelpContext" class="learning-help-context">Wybierz krótkie wyjaśnienie. Pomoc nie przerwie bieżącego zadania.</p>
+      <div class="learning-help-list">
+        <details data-help-for="home home-today"><summary>Jak działa plan „Dzisiaj”?</summary><p>Plan wybiera krótki kolejny krok na podstawie odblokowanych materiałów, terminów powtórek i Twojego celu. W zakładce Nauka zawsze możesz wybrać coś samodzielnie.</p><button id="reopenHomeGuide" class="text-button" type="button">Pokaż ponownie wskazówkę startową</button></details>
+        <details data-help-for="home-learn"><summary>Jak wybrać materiał?</summary><p>Jeśli nie wiesz, co wybrać, wróć do Dzisiaj. Biblioteka Nauka służy do świadomej powtórki albo pracy nad własnym celem.</p></details>
+        <details data-help-for="home-progress"><summary>Co oznacza postęp?</summary><p>Postęp pokazuje wykonaną pracę: utrwalone słowa, zdane sprawdzenia, ukończone tematy i własne wypowiedzi. Sam czas w aplikacji nie podnosi wyniku.</p></details>
+        <details data-help-for="home-profile"><summary>Co można zmienić w Profilu?</summary><p>Możesz przełączyć program Uczeń/Student, wybrać dostępny na urządzeniu naturalny głos angielski oraz wrócić do poziomu i celów.</p></details>
+        <details data-help-for="play sentences"><summary>Jak budować zdanie?</summary><p>Najpierw znajdź osobę lub rzecz, potem czasownik, a na końcu pozostałe informacje. Klocki możesz przeciągać albo zamieniać przez dotknięcie dwóch z nich.</p></details>
+        <details data-help-for="play"><summary>Co jeśli mikrofon się pomyli?</summary><p>Nie oznaczamy wtedy wymowy jako błędnej. Po dwóch niepewnych próbach możesz przejść dalej; wynik mówienia pozostaje nierozstrzygnięty i nie obniża poprawnego wyniku z pisania.</p></details>
+        <details data-help-for="vocabulary section play"><summary>Jak utrwalić słowo?</summary><p>Posłuchaj naturalnej wymowy, spróbuj powiedzieć słowo, a następnie wpisz je samodzielnie. Pisanie pokazuje, że naprawdę pamiętasz słowo, nie wybór przypadkowego pola.</p></details>
+        <details data-help-for="placement level-center"><summary>CEFR i Bloom — jaka jest różnica?</summary><p>CEFR opisuje orientacyjny poziom języka. Bloom opisuje głębokość zadania: od przypomnienia do własnej wypowiedzi i oceny według kryterium.</p></details>
+        <details data-help-for="tenses tense tense-drill bloom-lab"><summary>Jak uczyć się gramatyki?</summary><p>Zacznij od znaczenia i kontrastu dwóch zdań. Następnie zastosuj wzór, oceń przykład i zbuduj własną wypowiedź.</p></details>
+        <details data-help-for="map"><summary>Jak działa Wyprawa Jerzyka?</summary><p>Zbierz 20 słów i zdaj egzamin sekcji, aby odblokować kolejny przystanek. Dotknięcie zamkniętego punktu pokaże, czego jeszcze brakuje.</p></details>
+        <details data-help-for="all"><summary>Ustawienia dźwięku i dostępności</summary><p>Głos możesz zmienić w Profilu. Wszystkie gesty przeciągania mają też alternatywę opartą na zwykłym dotknięciu.</p></details>
+      </div>
+    </aside>
+  </div>
+
+  <section id="s-login" class="screen auth-screen on">
+    <div class="auth-card">
+      <div class="brand brand-large">
+        <svg class="bird" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50,19 C52.6,25 53.6,33 53.0,43 L55.4,71 L50,63 L44.6,71 L47.0,43 C46.4,33 47.4,25 50,19 Z" fill="currentColor"/><path d="M48.2,36 C36,37 20.5,44 8,63 C21,50.5 35,44.5 49.2,44.8 Z" fill="currentColor"/><path d="M51.8,36 C64,37 79.5,44 92,63 C79,50.5 65,44.5 50.8,44.8 Z" fill="currentColor"/></svg>
+        <strong>LingLing</strong>
+      </div>
+      <h1>Witaj!</h1>
+      <p class="lead">Wpisz swoje dane i rozpocznij naukę.</p>
+      <form id="studentLogin" class="form-stack" novalidate>
+        <label>Imię<input id="loginFirstName" name="firstName" autocomplete="given-name" maxlength="40" required></label>
+        <label>Pierwsza litera nazwiska<input id="loginLastInitial" name="lastInitial" autocomplete="off" maxlength="1" required></label>
+        <label>PIN<input id="loginPin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="4" aria-describedby="loginPinHint loginError" required><small id="loginPinHint" class="field-hint">PIN składa się z 4 cyfr.</small></label>
+        <p id="loginError" class="form-error" role="alert"></p>
+        <button class="primary" type="submit">Zaloguj się</button>
+      </form>
+      <button id="openRegister" class="text-button" type="button" hidden>Nie mam konta, chcę je założyć</button>
+      <button id="openAdminLogin" class="text-button" type="button">Panel administratora</button>
+      <p class="version-label">Wersja 16.0</p>
+    </div>
+  </section>
+
+  <section id="s-register" class="screen auth-screen">
+    <div class="auth-card">
+      <button id="backFromRegister" class="back-button" type="button">← Powrót</button>
+      <div class="brand brand-small">
+        <svg class="bird" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50,19 C52.6,25 53.6,33 53.0,43 L55.4,71 L50,63 L44.6,71 L47.0,43 C46.4,33 47.4,25 50,19 Z" fill="currentColor"/><path d="M48.2,36 C36,37 20.5,44 8,63 C21,50.5 35,44.5 49.2,44.8 Z" fill="currentColor"/><path d="M51.8,36 C64,37 79.5,44 92,63 C79,50.5 65,44.5 50.8,44.8 Z" fill="currentColor"/></svg>
+        <strong>LingLing</strong>
+      </div>
+      <h1>Nowe konto</h1>
+      <p class="lead">Wymyśl swój PIN i zapamiętaj go. Będzie potrzebny przy każdym logowaniu.</p>
+      <form id="studentRegister" class="form-stack" novalidate>
+        <fieldset class="track-choice">
+          <legend>Twoja ścieżka</legend>
+          <label class="track-option">
+            <input type="radio" name="track" value="school" checked>
+            <span class="track-card">
+              <strong>Uczeń</strong>
+              <span>Angielski pod program szkolny: wyprawa Jerzyka, słownictwo i gramatyka z lekcji.</span>
+            </span>
+          </label>
+          <label class="track-option">
+            <input type="radio" name="track" value="world">
+            <span class="track-card">
+              <strong>Student</strong>
+              <span>Angielski do życia i pracy: biznes, technologia, podróże, wiedza ogólna.</span>
+            </span>
+          </label>
+        </fieldset>
+        <label>Imię<input id="regFirstName" name="firstName" autocomplete="given-name" maxlength="40" required></label>
+        <label>Pierwsza litera nazwiska<input id="regLastInitial" name="lastInitial" autocomplete="off" maxlength="1" required></label>
+        <label>Wymyśl PIN, 4 cyfry<input id="regPin" name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="4" required></label>
+        <label>Powtórz PIN<input id="regPinRepeat" name="pinRepeat" type="password" inputmode="numeric" autocomplete="new-password" maxlength="4" required></label>
+        <p id="registerError" class="form-error" role="alert"></p>
+        <button class="primary" type="submit">Załóż konto i zacznij</button>
+      </form>
+      <p class="fine-print">Nikt nie odzyska za ciebie zapomnianego PIN-u. Nowy może wygenerować tylko administrator.</p>
+    </div>
+  </section>
+
+  <section id="s-admin-login" class="screen auth-screen">
+    <div class="auth-card">
+      <button id="backToStudentLogin" class="back-button" type="button">← Powrót</button>
+      <div class="brand brand-small">
+        <svg class="bird" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50,19 C52.6,25 53.6,33 53.0,43 L55.4,71 L50,63 L44.6,71 L47.0,43 C46.4,33 47.4,25 50,19 Z" fill="currentColor"/><path d="M48.2,36 C36,37 20.5,44 8,63 C21,50.5 35,44.5 49.2,44.8 Z" fill="currentColor"/><path d="M51.8,36 C64,37 79.5,44 92,63 C79,50.5 65,44.5 50.8,44.8 Z" fill="currentColor"/></svg>
+        <strong>LingLing</strong>
+      </div>
+      <h1>Panel administratora</h1>
+      <form id="adminLogin" class="form-stack">
+        <label>Hasło administratora<input id="adminPassword" type="password" autocomplete="current-password" required></label>
+        <p id="adminLoginError" class="form-error" role="alert"></p>
+        <button class="primary" type="submit">Zaloguj się</button>
+      </form>
+      <p class="version-label">Wersja 16.0</p>
+    </div>
+  </section>
+
+  <section id="s-home" class="screen app-screen home-screen">
+    <a class="skip-link" href="#homeMain">Przejdź do treści</a>
+    <main id="homeMain" class="content home-dashboard" tabindex="-1">
+        <div id="syncStatus" class="sync-status" aria-live="polite"></div>
+
+        <section id="homeToday" class="home-view td" data-home-view="today" role="region" aria-labelledby="homeNavToday">
+          <div class="td-grid">
+            <div class="td-main">
+              <section id="todayRecommendation" class="today-recommendation td-hero" aria-labelledby="todayGoalTitle">
+                <div class="today-recommendation-copy">
+                  <p class="td-date"><span id="tdGreet" class="td-greet"></span><span id="todayDateLabel"></span></p>
+                  <p id="welcomeName" class="td-hello">Cześć!</p>
+                  <p class="td-eyebrow">Następny przelot</p>
+                  <h1 id="todayGoalTitle">Krótka sesja powtórkowa</h1>
+                  <p id="todayGoalCopy" class="td-copy">Powtórzymy materiał, który najbardziej skorzysta na przypomnieniu.</p>
+                  <div id="todayGoalMeta" class="today-meta td-meta">6–8 min · krótki plan · zapis postępu</div>
+                  <div class="td-actions">
+                    <button id="todayPrimaryAction" class="primary" type="button">Kontynuuj naukę</button>
+                    <details class="today-rationale"><summary>Dlaczego to?</summary><p id="todayReason">To następny krok wynikający z Twojego aktualnego postępu.</p></details>
+                  </div>
+                </div>
+                <aside id="homeFirstGuide" class="context-guide" hidden aria-label="Pierwsza podpowiedź">
+                  <button id="homeFirstGuideClose" type="button" aria-label="Zamknij podpowiedź">×</button>
+                  <strong>Zacznij tutaj</strong>
+                  <p>LingLing dobiera kolejny krok z Twojego postępu. Zawsze możesz też samodzielnie wybrać materiał w zakładce Nauka.</p>
+                </aside>
+                <div class="today-progress sr-only" role="progressbar" aria-label="Postęp bieżącego etapu" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="today-progress-ring"><span id="todayWeekPercent">0%</span></div><small>bieżący etap</small></div>
+                <span id="streakN" class="sr-only">0</span>
+              </section>
+              <section class="today-plan td-board" aria-labelledby="todayPlanTitle">
+                <div class="td-board-head"><h2 id="todayPlanTitle">Dzisiejsze przeloty</h2><p id="todayPlanSummary">Jeden główny cel</p></div>
+                <div class="today-plan-list">
+                  <button id="todayPlanExplain" class="today-plan-row" type="button">
+                    <span class="today-plan-number done">✓</span>
+                    <span class="today-plan-copy"><strong>Plan jest gotowy</strong><span class="tp-short">Plan gotowy</span><small>Sprawdź, dlaczego właśnie ten krok jest teraz rekomendowany.</small></span>
+                    <span class="today-plan-cta"><span class="today-plan-time">Wyjaśnij</span><span class="today-plan-arrow" aria-hidden="true">→</span></span>
+                  </button>
+                  <button id="todayCoreAction" class="today-plan-row today-plan-row-primary" type="button">
+                    <span class="today-plan-number">2</span>
+                    <span class="today-plan-copy"><strong id="todayCoreTitle">Nauka i powtórka</strong><small id="todayCoreCopy">Materiał dopasowany do postępu.</small></span>
+                    <span class="today-plan-cta"><span class="today-plan-time" id="todayCoreTime">6–8 min</span><span class="today-plan-arrow" aria-hidden="true">→</span></span>
+                  </button>
+                  <button id="todayProgressAction" class="today-plan-row" type="button">
+                    <span class="today-plan-number">3</span>
+                    <span class="today-plan-copy"><strong>Postęp i następny krok</strong><span class="tp-short">Postęp</span><small>Zobacz zapisane wyniki, powtórki i najbliższy cel.</small></span>
+                    <span class="today-plan-cta"><span class="today-plan-time">Zobacz</span><span class="today-plan-arrow" aria-hidden="true">→</span></span>
+                  </button>
+                </div>
+              </section>
+              <p id="challengeLine" class="done-challenge"></p>
+            </div>
+            <div class="td-side track-school-only">
+              <button id="todayMapAction" class="td-route" type="button" aria-label="Twoja trasa: otwórz mapę wyprawy">
+                <span class="td-route-title">Twoja trasa</span>
+                <span id="tdRouteBig" class="td-route-art td-route-big"></span>
+                <span id="tdRouteFlat" class="td-route-art td-route-flat"></span>
+                <span id="tdRouteCaption" class="td-route-cap">Przystanek 1 z 25</span>
+              </button>
+              <section class="td-stamps-box" aria-labelledby="tdStampsTitle">
+                <div class="td-stamps-head"><h2 id="tdStampsTitle">Znaczki</h2><button id="todayBadgesLink" class="td-link" type="button">Paszport</button></div>
+                <ul id="tdStamps" class="td-stamps"></ul>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section id="homeLearn" class="home-view nu" data-home-view="learn" role="region" aria-labelledby="homeNavLearn" hidden>
+          <div class="nu-head"><h1>Nauka</h1><p>Wybierz, co ćwiczysz. Zamknięte moduły powiedzą, czego brakuje.</p></div>
+          <section class="learning-modules nu-modules" aria-label="Moduły nauki">
+            <section id="vocabularyLaunch" class="module-launch nu-card nu-feature vocabulary-launch track-school-only" aria-labelledby="vocabularyLaunchTitle">
+              <div class="module-launch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></div>
+              <div class="module-launch-copy"><p class="nu-kicker">Polecane teraz</p><h2 id="vocabularyLaunchTitle">Słówka do nauki</h2><p id="vocabularyLaunchHint" class="nu-d-text"></p><p id="vocabularyLaunchText" class="nu-t-text">0 z 500 słów.</p><p id="vocabularyLaunchShort" class="nu-m-text"></p><div class="module-progress" aria-hidden="true"><i id="vocabularyLaunchFill"></i></div><p id="vocabularyLaunchCount" class="nu-count"></p></div>
+              <button id="openVocabulary" class="primary" type="button">Zacznij od razu</button>
+            </section>
+            <section id="sentenceLaunch" class="module-launch nu-card nu-sentences sentence-launch track-school-only" aria-labelledby="sentenceLaunchTitle">
+              <div class="module-launch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-5 11-11 4 4L9 19z"/><path d="M14 6l4 4"/></svg></div>
+              <div class="module-launch-copy"><h2 id="sentenceLaunchTitle">Poukładaj zdania</h2><p id="sentenceLaunchText">0 zdań poznanych</p><div class="module-progress" aria-hidden="true"><i id="sentenceLaunchFill"></i></div></div>
+              <button id="openSentences" class="primary" type="button">Otwórz</button>
+            </section>
+            <section class="module-launch nu-card nu-grammar grammar-launch" aria-labelledby="grammarLaunchTitle">
+              <div class="module-launch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+              <div class="module-launch-copy"><h2 id="grammarLaunchTitle">Trenuj czasy</h2><p id="grammarLaunchText">8 czasów, poziomy A1 do B2</p></div>
+              <button id="openTenses" class="primary" type="button">Otwórz</button>
+            </section>
+            <section class="module-launch nu-card nu-vocabbase vocab-launch" aria-labelledby="vocabLaunchTitle">
+              <div class="module-launch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></div>
+              <div class="module-launch-copy"><h2 id="vocabLaunchTitle">Baza słówek</h2><p>Gotowe zestawy z życia i pracy</p></div>
+              <button id="openVocabBase" class="primary" type="button">Otwórz</button>
+            </section>
+            <h2 id="nuClosedHeading" class="nu-closed-head" hidden>Jeszcze zamknięte</h2>
+            <section id="storiesLaunch" class="module-launch nu-card nu-stories stories-launch track-school-only" aria-labelledby="storiesLaunchTitle">
+              <div class="module-launch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></div>
+              <div class="module-launch-copy"><h2 id="storiesLaunchTitle">Poznaj historie</h2><p id="storiesLaunchText">Krótkie teksty z pytaniami.</p></div>
+              <button id="openStories" class="primary" type="button">Otwórz</button>
+            </section>
+            <section id="dialoguesLaunch" class="module-launch nu-card nu-dialogues dialogues-launch track-school-only" aria-labelledby="dialoguesLaunchTitle">
+              <div class="module-launch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14V10a2 2 0 0 1 2-2h2.5L14 4v16l-5.5-4H6a2 2 0 0 1-2-2Z"/><path d="M17.5 9a4.5 4.5 0 0 1 0 6"/></svg></div>
+              <div class="module-launch-copy"><h2 id="dialoguesLaunchTitle">Ćwicz dialogi</h2><p id="dialoguesLaunchText">Odpowiadasz w prawdziwych sytuacjach.</p></div>
+              <button id="openDialogues" class="primary" type="button">Otwórz</button>
+            </section>
+            <section id="detectiveLaunch" class="module-launch nu-card nu-detective detective-launch track-school-only" aria-labelledby="detectiveLaunchTitle">
+              <div class="module-launch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg></div>
+              <div class="module-launch-copy"><h2 id="detectiveLaunchTitle">Popraweczki :)</h2><p id="detectiveLaunchText">Znajdujesz i poprawiasz błędy.</p></div>
+              <button id="openDetective" class="primary" type="button">Otwórz</button>
+            </section>
+          </section>
+          <section class="world-intro track-world-only"><h2>Ścieżka Student</h2><p>Materiał jest porządkowany przez orientacyjny poziom CEFR i wybrane cele. Niższe poziomy pozostają dostępne do powtórki.</p>
+            <button id="openBusiness" class="primary" type="button">💼 Sytuacje biznesowe (B2–C2)</button>
+            <button id="openCollocations" class="secondary" type="button">🔤 Kolokacje biznesowe (B2–C2)</button>
+          </section>
+        </section>
+
+        <section id="homeProgress" class="home-view" data-home-view="progress" role="region" aria-labelledby="homeNavProgress" hidden>
+          <div class="home-view-heading"><p class="eyebrow">Dowody nauki</p><h1>Postęp</h1><p>Tu widać, co już jest trwałe, co wymaga powtórki i jaki jest najbliższy cel.</p></div>
+          <section id="progressEmpty" class="empty-state" hidden>
+            <p class="empty-state-title">Tu pojawią się efekty Twojej nauki.</p>
+            <p class="empty-state-copy">Po pierwszej krótkiej sesji zobaczysz wykonane próby, powtórki i kolejny cel.</p>
+            <button id="progressEmptyAction" class="primary" type="button">Zacznij pierwszą sesję</button>
+          </section>
+          <section class="overview track-school-only" aria-label="Postępy">
+            <div><b id="allCollected">0</b><span>z 500 słów</span></div><div><b id="passedN">0</b><span>zdanych egzaminów</span></div><div><b id="openN">1</b><span>otwartych sekcji</span></div><div><b id="featherN">0</b><span>piórka</span></div><div><b id="badgeN">0</b><span>z 7 odznak</span></div>
+          </section>
+          <section class="level-home-card" aria-labelledby="levelHomeTitle">
+            <div class="level-home-main"><span id="homeCefrBadge" class="cefr-badge large">?</span><div><p class="eyebrow">Poziom startowy</p><h2 id="levelHomeTitle">Sprawdź, od czego zacząć</h2><p id="homeCefrSummary">Krótki test wskaże orientacyjny poziom A1–C2. Nie jest certyfikatem CEFR.</p></div></div>
+            <div class="level-home-actions"><button id="openPlacement" class="primary" type="button">Zrób test poziomujący</button><button id="openLevelCenter" class="secondary" type="button">Poziom i plan nauki</button></div>
+          </section>
+          <section id="adaptiveEvidenceCard" class="adaptive-evidence-card" aria-labelledby="adaptiveEvidenceTitle">
+            <div class="adaptive-evidence-head">
+              <div><p class="eyebrow">Profil oparty na wykonaniu</p><h2 id="adaptiveEvidenceTitle">Zadawanie pytań</h2></div>
+              <span id="adaptiveEvidenceStatus" class="evidence-status">Zbieramy pierwsze wyniki</span>
+            </div>
+            <p>Każdy rodzaj zadania jest liczony osobno. Rozpoznanie wzoru nie udaje jeszcze samodzielnej wypowiedzi.</p>
+            <div id="adaptiveEvidenceRows" class="evidence-rows" aria-live="polite"></div>
+            <div class="adaptive-evidence-footer"><strong id="adaptiveDueReviews">0 powtórek czeka</strong><span id="adaptiveEvidenceNote">Wskaźniki są opisem zebranych wyników, nie certyfikatem ani diagnozą.</span></div>
+          </section>
+          <section class="world-progress track-world-only" aria-labelledby="worldProgressTitle">
+            <div class="section-heading"><div><p class="eyebrow">Twój plan</p><h2 id="worldProgressTitle">Postęp ścieżki Student</h2></div><p id="worldProgressSummary">Najpierw wykonaj test poziomujący i wybierz cele.</p></div>
+            <div class="world-progress-grid">
+              <div><b id="worldGoalN">0</b><span>wybrane cele</span></div>
+              <div><b id="worldGrammarN">0</b><span>ukończone tematy</span></div>
+              <div><b id="worldBloomN">0</b><span>własne wypowiedzi</span></div>
+            </div>
+          </section>
+          <button id="openMap" class="journey-progress-card track-school-only" type="button"><span><small>25 przystanków</small><strong>Mapa wyprawy Jerzyka</strong><em>Drugi przystanek: Warszawa</em></span><span aria-hidden="true">→</span></button>
+          <section class="home-badges track-school-only" aria-labelledby="homeBadgesTitle"><div class="home-badges-head"><div><p class="eyebrow">Osiągnięcia</p><h2 id="homeBadgesTitle">Odznaki Jerzyka</h2></div><strong id="homeBadgeCount">0 z 7 zdobytych</strong></div><p class="home-badges-copy">Dotknij odznaki, aby sprawdzić warunek i otworzyć dwujęzyczną opowieść.</p><div id="homeBadgeList" class="badge-list home-badge-list"></div></section>
+        </section>
+
+        <section id="homeProfile" class="home-view" data-home-view="profile" role="region" aria-labelledby="homeNavProfile" hidden>
+          <div class="home-view-heading"><p class="eyebrow">Ustawienia</p><h1>Profil</h1><p>Cel, sposób nauki i głos są zawsze dostępne w jednym miejscu.</p></div>
+          <div class="profile-grid">
+            <section class="profile-card"><p class="eyebrow">Program</p><h2 id="profileTrackTitle">Uczeń</h2><p id="profileTrackCopy">Angielski szkolny, kolekcja słów i wyprawa Jerzyka.</p><button id="trackToggle" class="secondary" type="button">Przełącz na Studenta</button></section>
+            <section class="profile-card"><p class="eyebrow">Lektor</p><h2>Naturalny głos angielski</h2><label class="voice-field">Głos lektora<select id="studentVoiceSelect" aria-describedby="studentVoiceInfo"><option>Sprawdzam dostępne głosy…</option></select></label><p id="studentVoiceInfo" class="voice-info">Sprawdzam dostępne głosy…</p><button id="studentTestVoice" class="secondary" type="button">Posłuchaj głosu</button></section>
+            <section class="profile-card profile-plan-card"><p class="eyebrow">Poziom i cele</p><h2 id="profileLevelTitle">Punkt startu nieustalony</h2><p id="profileLevelCopy">Test orientacyjny pomaga ominąć materiał, który już znasz, i nie zamyka wcześniejszych powtórek.</p><button id="profileOpenLevelCenter" class="secondary" type="button">Otwórz poziom i plan</button></section>
+          </div>
+        </section>
+    </main>
+  </section>
+
+  <section id="s-level-center" class="screen app-screen">
+    <header class="simple-header"><button id="levelCenterBack" class="back-button" type="button">← Strona główna</button><span>Poziom i plan nauki</span></header>
+    <main class="content level-center-content">
+      <section class="axis-explainer" aria-labelledby="axisTitle">
+        <div><p class="eyebrow">Dwie niezależne osie</p><h1 id="axisTitle">CEFR mówi „co umiesz”, Bloom – „co robisz z wiedzą”</h1></div>
+        <div class="axis-grid">
+          <article><span class="axis-icon">CEFR</span><h2>Poziom językowy</h2><p>Test wejściowy szacuje zakres A1–C2 na podstawie gramatyki, znaczenia, słownictwa, komunikacji i krótkiego czytania.</p></article>
+          <article><span class="axis-icon bloom">Bloom</span><h2>Głębokość zadania</h2><p>W nauce przechodzisz od przypominania i rozumienia do zastosowania, analizy, oceny według kryteriów i własnej wypowiedzi.</p></article>
+        </div>
+      </section>
+      <section id="levelResultCard" class="level-result-card" aria-labelledby="levelResultTitle">
+        <div id="levelCenterBadge" class="cefr-badge hero">?</div>
+        <div><p class="eyebrow">Twój orientacyjny punkt startu</p><h2 id="levelResultTitle">Test jeszcze niewykonany</h2><p id="levelResultCopy">Zaczynamy od A2 i poruszamy się schodkowo. Przy niepewnym wyniku dostaniesz dwa pytania potwierdzające.</p><p id="levelResultMeta" class="level-result-meta"></p><div id="levelEvidence" class="area-list"></div></div>
+        <button id="levelAdaptiveStart" class="primary" type="button">Rozpocznij test</button>
+      </section>
+      <section class="level-section" aria-labelledby="checksTitle">
+        <div class="section-heading"><div><p class="eyebrow">Ewaluacja wiedzy</p><h2 id="checksTitle">Sprawdź dowolny poziom</h2></div><p>8 zadań z jednego poziomu. Zdanie podnosi dostępny poziom nauki, nie obniża wcześniejszego wyniku.</p></div>
+        <div id="levelChecks" class="level-checks"></div>
+      </section>
+      <section class="level-section" aria-labelledby="goalsTitle">
+        <div class="section-heading"><div><p class="eyebrow">Twój wybór</p><h2 id="goalsTitle">Czego chcesz się nauczyć?</h2></div><p>Zaznacz cele z dostępnego programu. To zmienia kolejność rekomendacji, ale nie zamyka powtórek.</p></div>
+        <div id="learningGoals" class="learning-goals"></div>
+        <p id="goalsStatus" class="fine-print" aria-live="polite"></p>
+      </section>
+      <section class="level-section" aria-labelledby="bloomMapTitle">
+        <div class="section-heading"><div><p class="eyebrow">Głębokie uczenie</p><h2 id="bloomMapTitle">Twoja mapa Blooma</h2></div><p>Test CEFR nie ocenia Blooma. Tutaj widzisz, na ilu tematach potrafisz ocenić rozwiązanie i stworzyć własną wypowiedź.</p></div>
+        <div id="bloomMap" class="bloom-map"></div>
+      </section>
+      <p class="method-note">Wynik LingLing jest orientacyjnym przypisaniem punktu startu. Nie zastępuje pełnego, certyfikowanego egzaminu CEFR, ponieważ nie bada wszystkich sprawności w warunkach standaryzowanych.</p>
+    </main>
+  </section>
+
+  <section id="s-placement" class="screen app-screen">
+    <header class="simple-header"><button id="placementBack" class="back-button" type="button">← Przerwij</button><span id="placementHeader">Test poziomujący</span></header>
+    <main class="content narrow placement-content">
+      <div class="placement-top"><div><p id="placementEyebrow" class="eyebrow">Orientacyjny CEFR · A1–C2</p><h1 id="placementTitle">Znajdźmy dobry punkt startu</h1></div><span id="placementLevelBadge" class="cefr-badge">A2</span></div>
+      <p id="placementIntro" class="placement-intro">Odpowiadaj samodzielnie. Gdy nie wiesz, wybierz „Nie wiem”. To daje rzetelniejszy wynik niż zgadywanie.</p>
+      <div class="bar"><i id="placementFill"></i></div>
+      <p id="placementCounter" class="placement-counter" aria-live="polite"></p>
+      <div id="placementStage"></div>
+    </main>
+  </section>
+
+  <section id="s-vocabulary" class="screen app-screen">
+    <header class="simple-header"><button id="vocabularyBack" class="back-button" type="button">← Strona główna</button><span>Kolekcja słów</span></header>
+    <main class="content vocabulary-content">
+      <section class="sentence-hero vocabulary-hero">
+        <div><p class="eyebrow">Moduł 1 · zapamiętanie</p><h1>Wybierz sekcję słówek</h1><p>Każda sekcja zawiera 20 słów. Zbierz je i zdaj egzamin, aby otworzyć kolejną.</p></div>
+        <div class="sentence-summary" aria-label="Postęp w słówkach">
+          <div><b id="vocabularyCollectedN">0</b><span>z 500 słów</span></div>
+          <div><b id="vocabularyPassedN">0</b><span>zdanych egzaminów</span></div>
+          <div><b id="vocabularyOpenN">1</b><span>otwartych sekcji</span></div>
+        </div>
+      </section>
+      <div class="section-heading"><div><p class="eyebrow">25 etapów</p><h2>Sekcje słówek</h2></div><p>Dotknij otwartej sekcji, aby uczyć się lub powtarzać słowa.</p></div>
+      <div id="sectionsGrid" class="sections-grid"></div>
+    </main>
+  </section>
+
+  <section id="s-sentences" class="screen app-screen">
+    <header class="simple-header"><button id="sentencesBack" class="back-button" type="button">← Strona główna</button><span>Klocki zdań</span></header>
+    <main class="content sentence-content">
+      <section class="sentence-hero">
+        <div><p class="eyebrow">Moduł 2 · budowanie, pisanie i mówienie</p><h1>Buduj zdania krok po kroku</h1><p>Ułóż zdanie, przepisz je dokładnie, posłuchaj naturalnego wzoru i przeczytaj na głos. Mikrofon daje informację zwrotną, ale po dwóch niepewnych próbach pozwoli iść dalej i skieruje zdanie do powtórki.</p></div>
+        <div class="sentence-summary" aria-label="Postęp w zdaniach">
+          <div><b id="sentenceKnownN">0</b><span id="sentenceTotalLabel">z 70 zdań</span></div>
+          <div><b id="sentenceOpenN">1</b><span>otwartych tematów</span></div>
+          <div><b id="sentenceFeatherN">0</b><span>piórka</span></div>
+        </div>
+      </section>
+      <p id="sentenceHubNote" class="sentence-hub-note"></p>
+      <div id="patternGrid" class="pattern-grid"></div>
+    </main>
+  </section>
+
+  <section id="s-section" class="screen app-screen">
+    <header class="simple-header"><button id="sectionBack" class="back-button" type="button">← Sekcje</button><span id="sectionNumber"></span></header>
+    <main class="content narrow">
+      <div class="section-title"><span id="sectionIcon" class="section-icon"></span><div><p class="eyebrow" id="sectionEyebrow"></p><h1 id="sectionTitle"></h1><p id="sectionProgress"></p></div></div>
+      <div id="wordGrid" class="word-grid"></div>
+      <div id="sectionAction" class="action-panel"></div>
+    </main>
+  </section>
+
+  <section id="s-play" class="screen app-screen">
+    <main class="content narrow">
+      <div class="play-top">
+        <div class="play-label"><span id="playStageName" class="play-kicker"></span><span id="playSectionName" class="play-section"></span></div>
+        <button id="quit" class="play-quit" type="button">Zakończ</button>
+      </div>
+      <div class="play-progress"><div class="bar"><i id="barFill"></i></div><span id="playCounter" class="play-counter"></span></div>
+      <div id="stage"></div>
+    </main>
+  </section>
+
+  <section id="s-done" class="screen app-screen">
+    <main class="content narrow done">
+      <div class="done-mark">✓</div>
+      <h1 id="doneTitle">Dobra robota!</h1>
+      <div class="overview done-stats">
+        <div><b id="dNew">0</b><span id="dNewLabel">nowe słowa</span></div>
+        <div><b id="dOk">0</b><span id="dOkLabel">trafione</span></div>
+        <div><b id="dSection">0</b><span id="dSectionLabel">z 20 zebranych</span></div>
+        <div><b id="dFeathers">0</b><span>piórka</span></div>
+      </div>
+      <p id="doneChallenge" class="done-challenge"></p>
+      <div id="dList" class="new-list"></div>
+      <div id="doneAction"></div>
+      <button id="doneBack" class="secondary wide" type="button">Wróć do sekcji</button>
+    </main>
+  </section>
+
+  <section id="s-break" class="screen app-screen">
+    <main class="content narrow break">
+      <div class="br-head">
+        <p class="br-kicker" id="breakKicker">Etap zrobiony</p>
+        <h1 id="breakTitle" class="br-title">Chwila przerwy</h1>
+        <p id="breakLead" class="br-lead"></p>
+        <ol id="breakSteps" class="br-steps" aria-label="Etapy dzisiejszej nauki"></ol>
+      </div>
+
+      <section class="br-card br-feathers" aria-labelledby="breakFeathersTitle">
+        <div class="br-feathers-num"><b id="breakFeathers">0</b><span id="breakFeathersUnit">piórek</span></div>
+        <div class="br-feathers-copy">
+          <h2 id="breakFeathersTitle">Piórka w tej sesji</h2>
+          <p id="breakFeathersText"></p>
+          <p class="br-total" id="breakFeathersTotal"></p>
+        </div>
+      </section>
+
+      <section class="br-card br-next" aria-labelledby="breakNextTitle">
+        <p class="br-label">Za chwilę</p>
+        <h2 id="breakNextTitle">Główna część</h2>
+        <p id="breakNextText"></p>
+        <p class="br-time" id="breakNextTime"></p>
+      </section>
+
+      <section id="breakChallenge" class="br-card br-challenge" aria-labelledby="breakChallengeLabel" hidden>
+        <p class="br-label" id="breakChallengeLabel">Wyzwanie dnia</p>
+        <p id="breakChallengeText" class="br-challenge-text"></p>
+        <div class="br-bar" role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="1" id="breakChallengeBar"><i id="breakChallengeFill"></i></div>
+        <p id="breakChallengeCount" class="br-challenge-count"></p>
+      </section>
+
+      <section class="br-card br-journey" aria-labelledby="breakJourneyLabel">
+        <p class="br-label" id="breakJourneyLabel">Na odpoczynek: ciekawostka z podróży Jerzyka</p>
+        <div id="breakBody" class="break-body"></div>
+      </section>
+
+      <div class="br-actions">
+        <button id="breakContinue" class="primary wide" type="button">Lecimy dalej</button>
+        <button id="breakStop" class="secondary wide" type="button">Kończę na dziś</button>
+        <p class="br-note">Twój postęp jest już zapisany. Następnym razem wrócisz dokładnie tu, gdzie skończysz.</p>
+      </div>
+    </main>
+  </section>
+
+  <section id="s-tenses" class="screen app-screen">
+    <header class="simple-header"><button id="tensesBack" class="back-button" type="button">← Wróć</button><span>Czasy angielskie</span></header>
+    <main class="content narrow">
+      <p class="lead">Każdy czas uczysz się przez kontrast: to samo zdanie w dwóch czasach, żeby poczuć różnicę. Nie regułka, tylko działanie.</p>
+      <p id="tensesGuidance" class="method-note"></p>
+      <div id="tensesList" class="tenses-list"></div>
+    </main>
+  </section>
+
+  <section id="s-tense" class="screen app-screen">
+    <header class="simple-header"><button id="tenseBack" class="back-button" type="button">← Czasy</button><span id="tenseHeaderName">Czas</span></header>
+    <main class="content narrow">
+      <div class="tense-tags"><span id="tenseCefr" class="tag-cefr">A1</span><span id="tenseBloom" class="tag-bloom">Zastosowanie</span></div>
+      <p id="tenseShort" class="tense-short"></p>
+      <section class="tense-form">
+        <p class="eyebrow">Jak to zbudować</p>
+        <p id="tenseForm" class="tense-form-text"></p>
+        <div id="tenseExamples" class="tense-examples"></div>
+      </section>
+      <section class="tense-contrast">
+        <p class="eyebrow">Poczuj różnicę</p>
+        <p id="tenseContrastPrompt" class="tense-contrast-prompt"></p>
+        <div class="tense-contrast-pair">
+          <button id="tenseContrastA" class="tense-contrast-line" type="button"></button>
+          <button id="tenseContrastB" class="tense-contrast-line" type="button"></button>
+        </div>
+        <p id="tenseContrastNote" class="tense-contrast-note"></p>
+      </section>
+      <button id="tenseStartDrills" class="primary wide" type="button">Ćwicz ten czas</button>
+      <button id="tenseStartBloom" class="secondary wide" type="button">Oceń i stwórz własne zdanie</button>
+      <div id="tenseBloomStatus" class="tense-bloom-status"></div>
+    </main>
+  </section>
+
+  <section id="s-tense-drill" class="screen app-screen">
+    <header class="simple-header"><button id="tenseDrillBack" class="back-button" type="button">← Przerwij</button><span id="tenseDrillName">Ćwiczenia</span></header>
+    <main class="content narrow">
+      <div class="bar"><i id="tenseDrillFill"></i></div>
+      <div id="tenseDrillStage"></div>
+    </main>
+  </section>
+
+  <section id="s-bloom-lab" class="screen app-screen">
+    <header class="simple-header"><button id="bloomLabBack" class="back-button" type="button">← Wróć do czasu</button><span id="bloomLabHeader">Pracownia Blooma</span></header>
+    <main class="content narrow bloom-lab-content">
+      <div class="bar bloom-bar"><i id="bloomLabFill"></i></div>
+      <div id="bloomLabStage"></div>
+    </main>
+  </section>
+
+  <section id="s-collocations" class="screen app-screen">
+    <header class="simple-header"><button id="collocationsBack" class="back-button" type="button">← Wróć</button><span>Kolokacje biznesowe</span></header>
+    <main class="content narrow">
+      <p class="lead">Na poziomie B2-C2 liczy się nie znaczenie słowa, ale jego naturalne połączenia. Mówi się „meet a deadline", nie „fulfill a deadline". Ucz się słów razem z tym, z czym chodzą.</p>
+      <div id="collocationSets" class="collocation-sets"></div>
+    </main>
+  </section>
+
+  <section id="s-collocation-set" class="screen app-screen">
+    <header class="simple-header"><button id="collocationSetBack" class="back-button" type="button">← Zestawy</button><span id="collocationSetName">Zestaw</span></header>
+    <main class="content narrow"><div id="collocationWords" class="collocation-words"></div></main>
+  </section>
+
+  <section id="s-business" class="screen app-screen">
+    <header class="simple-header"><button id="businessBack" class="back-button" type="button">← Wróć</button><span>Sytuacje biznesowe</span></header>
+    <main class="content narrow">
+      <p class="lead">Uczysz się przez rozmowę, nie przez listy słówek. Każda sytuacja to realny moment z pracy: spotkanie, mail, negocjacja, trudny feedback. Mówisz pełnymi zdaniami. Poziom rośnie od B2 do C2.</p>
+      <div id="businessList" class="business-list"></div>
+    </main>
+  </section>
+
+  <section id="s-business-run" class="screen app-screen">
+    <header class="simple-header"><button id="businessRunBack" class="back-button" type="button">← Sytuacje</button><span id="businessRunName">Sytuacja</span></header>
+    <main class="content narrow">
+      <div class="bar"><i id="businessFill"></i></div>
+      <div id="businessStage"></div>
+    </main>
+  </section>
+
+  <section id="s-module-run" class="screen app-screen">
+    <header class="simple-header"><button id="moduleRunBack" class="back-button" type="button">← Wróć</button><span id="moduleRunName">Zadanie</span></header>
+    <main class="content narrow"><div id="moduleRunStage"></div></main>
+  </section>
+
+  <section id="s-stories" class="screen app-screen">
+    <header class="simple-header"><button id="storiesBack" class="back-button" type="button">← Wróć</button><span>Historyjki</span></header>
+    <main class="content narrow"><p class="lead">Krótkie teksty do przeczytania i zrozumienia. Po każdym kilka pytań.</p><div id="storiesList" class="module-list"></div></main>
+  </section>
+  <section id="s-dialogues" class="screen app-screen">
+    <header class="simple-header"><button id="dialoguesBack" class="back-button" type="button">← Wróć</button><span>Dialogi</span></header>
+    <main class="content narrow"><p class="lead">Prawdziwe sytuacje. Odpowiadasz pełnym zdaniem, głosem lub pisząc.</p><div id="dialoguesList" class="module-list"></div></main>
+  </section>
+  <section id="s-detective" class="screen app-screen">
+    <header class="simple-header"><button id="detectiveBack" class="back-button" type="button">← Wróć</button><span>Detektyw błędów</span></header>
+    <main class="content narrow"><p class="lead">Znajdujesz błąd, poprawiasz go i uzasadniasz. Wracają też Twoje własne pomyłki.</p><div id="detectiveList" class="module-list"></div></main>
+  </section>
+
+  <section id="s-vocab-base" class="screen app-screen">
+    <header class="simple-header"><button id="vocabBaseBack" class="back-button" type="button">← Wróć</button><span>Baza słówek</span></header>
+    <main class="content narrow">
+      <p class="lead">Słownictwo tematyczne z życia i pracy. Uczysz się przez wymowę i pisownię. Ukończenie dziedziny otwiera następną.</p>
+      <div id="vocabDomains" class="vocab-domains"></div>
+    </main>
+  </section>
+
+  <section id="s-pools" class="screen app-screen">
+    <header class="simple-header"><button id="poolsBack" class="back-button" type="button">← Wróć</button><span>Pule słówek</span></header>
+    <main class="content narrow">
+      <p class="lead">Twoje własne zestawy słówek. Wklej listę, po jednym słowie w linii, w formacie: <strong>słowo - tłumaczenie</strong>.</p>
+      <section class="pool-create">
+        <label>Nazwa puli<input id="poolName" type="text" maxlength="60" placeholder="np. Lekcja 5, Biznes"></label>
+        <label>Wklej listę słówek
+          <textarea id="poolList" rows="7" placeholder="dog - pies&#10;business - biznes&#10;invoice - faktura"></textarea>
+        </label>
+        <button id="poolPreview" class="secondary" type="button">Sprawdź listę</button>
+        <div id="poolPreviewBox" class="pool-preview" hidden></div>
+        <p id="poolError" class="form-error" role="alert"></p>
+        <button id="poolCreate" class="primary wide" type="button" disabled>Utwórz pulę</button>
+      </section>
+      <h2 class="map-heading">Twoje pule</h2>
+      <div id="poolsList" class="pools-list"></div>
+      <p id="poolsEmpty" class="fine-print" hidden>Nie masz jeszcze żadnej puli. Wklej listę powyżej, aby zacząć.</p>
+    </main>
+  </section>
+
+  <section id="s-map" class="screen app-screen">
+    <header class="simple-header"><button id="mapBack" class="back-button" type="button">← Wróć</button><span>Wyprawa Jerzyka</span></header>
+    <main class="content">
+      <section class="journey-explainer" aria-label="Jak działa wyprawa">
+        <article>
+          <span class="journey-explainer-icon" aria-hidden="true">🗺️</span>
+          <div><h1>Co to jest Wyprawa Jerzyka?</h1><p>To wymyślona trasa od Jerzykowa do Tasmanii. Każda z 25 sekcji słówek jest jednym etapem. Zbierz 20 słów i zdaj egzamin, a Jerzyk poleci do następnego przystanku.</p></div>
+        </article>
+        <article>
+          <span class="journey-explainer-icon" aria-hidden="true">🪶</span>
+          <div><h2>Czym są piórka?</h2><p>To nagrody za wymagające osiągnięcia: dobre zadanie za pierwszym razem, poprawienie błędu lub bezbłędny egzamin. Nie są oceną ani rankingiem i nie dostaje się ich za sam czas w aplikacji.</p></div>
+        </article>
+      </section>
+      <p class="lead" id="mapLead"></p>
+      <section class="journey-map-card" aria-labelledby="journeyMapTitle">
+        <div class="journey-map-head">
+          <div><p class="eyebrow">Prawdziwa mapa geograficzna</p><h2 id="journeyMapTitle">Szlak Jerzyka</h2></div>
+          <div class="journey-map-legend" aria-label="Legenda"><span><i class="reached"></i>odwiedzone</span><span><i class="locked"></i>zablokowane</span></div>
+        </div>
+        <div id="journeyRouteMap" class="journey-route-map" aria-label="Prawdziwa statyczna mapa geograficzna 25 przystanków wyprawy"></div>
+        <p class="map-data-note">Nieruchomy podkład OpenStreetMap pokazuje rzeczywiste kraje i miejscowości. Linia łączy przystanki wymyślonej wyprawy.</p>
+        <p id="mapHint" class="map-hint" aria-live="polite">Najedź na punkt, aby zobaczyć nazwę miejsca. Dotknij go, aby sprawdzić przystanek lub warunki odblokowania.</p>
+      </section>
+      <h2 class="map-heading first">Przystanki i opowieści</h2>
+      <ol id="mapList" class="map-list"></ol>
+      <h2 class="map-heading">Odznaki</h2>
+      <div id="badgeList" class="badge-list"></div>
+      <p class="fine-print">Wyprawa jest wymyślona, ale każdy fakt jest prawdziwy. Każdy przystanek ma opis po polsku i po angielsku oraz angielskiego lektora.</p>
+    </main>
+  </section>
+
+  <section id="s-exam" class="screen app-screen">
+    <header class="simple-header"><button id="examQuit" class="back-button" type="button">← Sekcja</button><span id="examSectionName"></span></header>
+    <main class="content exam-content">
+      <div class="exam-top"><div><p class="eyebrow">Egzamin końcowy</p><h1 id="examTitle"></h1></div><div class="round-pill" id="examRound">Runda 1 z 4</div></div>
+      <p class="exam-instruction">Kliknij obrazek, a potem pasujące słowo. Każdy element możesz odsłuchać.</p>
+      <div class="exam-progress"><i id="examProgress"></i></div>
+      <p id="examFeedback" class="exam-feedback" aria-live="assertive"></p>
+      <div id="examSkip" hidden></div>
+      <div id="matchBoard" class="match-board">
+        <div><h2>Obrazki</h2><div id="examImages" class="match-column"></div></div>
+        <div><h2>Słowa</h2><div id="examWords" class="match-column"></div></div>
+      </div>
+      <div id="examComplete" class="exam-complete" hidden></div>
+    </main>
+  </section>
+
+  <section id="s-admin" class="screen admin-screen">
+    <header class="admin-header">
+      <div><p class="eyebrow">LingLing</p><h1>Panel administratora</h1></div>
+      <button id="adminLogout" class="small-button" type="button">Wyloguj</button>
+    </header>
+    <main class="admin-content">
+      <section class="admin-card create-card">
+        <div><p class="eyebrow">Nowe konto</p><h2>Dodaj ucznia</h2><p>System wygeneruje jednorazowo 4-cyfrowy PIN.</p></div>
+        <form id="createStudent" class="create-form">
+          <label>Imię<input id="newFirstName" maxlength="40" required></label>
+          <label>Litera nazwiska<input id="newLastInitial" maxlength="1" required></label>
+          <label>Program<select id="newTrack"><option value="school">Uczeń</option><option value="world">Student</option></select></label>
+          <button class="primary" type="submit">Utwórz konto</button>
+        </form>
+      </section>
+      <section class="admin-card create-card">
+        <div><p class="eyebrow">Diagnostyka</p><h2>Tryb testowy i lektor</h2><p>Przejście całej ścieżki ucznia bez mikrofonu i bez wpisywania. Wszystkie sekcje otwarte, postęp nigdzie nie jest zapisywany.</p></div>
+        <div class="diagnostic-actions">
+          <button id="openTestMode" class="secondary" type="button">Wejdź w tryb testowy</button>
+          <label class="voice-field">Głos lektora
+            <select id="voiceSelect" aria-describedby="voiceInfo"><option>Sprawdzam dostępne głosy…</option></select>
+          </label>
+          <p id="voiceInfo" class="voice-info">Sprawdzam dostępne głosy…</p>
+          <button id="testVoice" class="secondary" type="button">Posłuchaj wybranego głosu</button>
+        </div>
+      </section>
+      <section id="credentialsCard" class="credentials-card" hidden>
+        <div><p class="eyebrow">Dane logowania – zapisz teraz</p><h2 id="credentialsName"></h2></div>
+        <div class="pin-box"><span>PIN</span><b id="credentialsPin"></b></div>
+        <div class="credential-actions"><button id="copyCredentials" class="secondary" type="button">Kopiuj</button><button id="printCredentials" class="secondary" type="button">Drukuj</button></div>
+        <p>Po zamknięciu tej informacji PIN nie będzie możliwy do odczytania. W razie potrzeby można wygenerować nowy.</p>
+      </section>
+      <section class="admin-card students-card">
+        <div class="admin-list-head"><div><p class="eyebrow">Uczniowie</p><h2>Konta i postępy</h2></div><button id="refreshStudents" class="secondary" type="button">Odśwież</button></div>
+        <p id="adminError" class="form-error" role="alert"></p>
+        <div class="table-wrap">
+          <table><thead><tr><th>Uczeń</th><th>Program</th><th>CEFR</th><th>Słowa</th><th>Zdania</th><th>Sekcja</th><th>Egzaminy</th><th>Ostatnia aktywność</th><th></th></tr></thead><tbody id="studentsBody"></tbody></table>
+        </div>
+        <div id="studentsEmpty" class="empty-state" hidden>Nie ma jeszcze kont uczniów.</div>
+      </section>
+    </main>
+  </section>
+
+  <script src="./words.js"></script>
+  <script src="./ipa.js"></script>
+  <script src="./patterns.js"></script>
+  <script src="./sentence-gen.js"></script>
+  <script src="./pool-parser.js"></script>
+  <script src="./levels.js"></script>
+  <script src="./can-do.js"></script>
+  <script src="./tenses.js"></script>
+  <script src="./business.js"></script>
+  <script src="./collocations.js"></script>
+  <script src="./vocab-base.js"></script>
+  <script src="./placement.js"></script>
+  <script src="./bloom-lab.js"></script>
+  <script src="./learning-events.js"></script>
+  <script src="./mastery-engine.js"></script>
+  <script src="./review-engine.js"></script>
+  <script src="./learner-model.js"></script>
+  <script src="./task-engine.js"></script>
+  <script src="./adaptation-engine.js"></script>
+  <script src="./stories.js"></script>
+  <script src="./dialogues.js"></script>
+  <script src="./errors.js"></script>
+  <script src="./journey.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
