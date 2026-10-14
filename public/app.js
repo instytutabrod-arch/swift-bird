@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '16.4';
+const APP_VERSION = '16.5';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -509,7 +509,7 @@ function renderAdaptiveEvidence(model){
   host.textContent='';
   EVIDENCE_DIMENSIONS.forEach(id=>{
     const value=skill&&skill.dimensions&&skill.dimensions[id]?skill.dimensions[id]:emptyEvidenceDimension();
-    const row=make('div','evidence-row');
+    const row=make('div','evidence-row dim-'+EVIDENCE_DIMENSIONS.indexOf(id));
     row.append(make('strong','',EVIDENCE_LABELS[id]||id));
     row.append(make('span','',value.label||(value.evidenceScore===null?'brak danych':'rozwijane')));
     row.append(make('small','',value.evidenceWeight?('pewność: '+value.confidence+' · '+value.observations+' prób'):'potrzebna pierwsza próba'));
@@ -1281,6 +1281,10 @@ function renderHome(){
   $('#openN').textContent=open;
   $('#featherN').textContent=S.feathers||0;
   $('#badgeN').textContent=badgeCount;
+  $('#featherN').closest('.stat-tile').querySelector('span').textContent=kanwaPlural(S.feathers||0,'piórko','piórka','piórek');
+  $('#passedN').closest('.stat-tile').querySelector('span').textContent=kanwaPlural(passed,'zdany egzamin','zdane egzaminy','zdanych egzaminów');
+  $('#badgeN').closest('.stat-tile').querySelector('span').textContent='z '+BADGES.length+' '+kanwaPlural(BADGES.length,'odznaki','odznak','odznak');
+  renderRouteMini();
   $('#homeBadgeCount').textContent=badgeCount+' z '+BADGES.length+' zdobytych';
   renderBadgeGallery($('#homeBadgeList'));
   renderVocabularyLaunch();
@@ -2468,7 +2472,7 @@ function renderBadgeGallery(host){
     chip.append(disc);
     chip.append(make('strong','',badge.name));
     chip.append(make('span','badge-desc',badge.desc));
-    chip.append(make('span','badge-state',owned?'✓ Zdobyta · przeczytaj opowieść':'Do zdobycia'));
+    chip.append(make('span','badge-state',owned?'Zdobyta':'Do zdobycia'));
     if(owned)chip.addEventListener('click',()=>{badgeQueue=[badge];showNextBadge();});
     else chip.addEventListener('click',()=>toast('Warunek odznaki „'+badge.name+'”: '+badge.desc+'.'));
     host.append(chip);
@@ -2540,6 +2544,47 @@ $('#badgeClose').addEventListener('click',closeBadge);
 
 /* Postęp wyprawy wynika z liczby zdanych egzaminów, więc nie trzeba
    przechowywać go osobno i nie da się rozjechać ze stanem sekcji. */
+/* Mała mapa trasy na ekranie Postęp: trzy odcinki krzywej Béziera, na nich
+   przystanki. Czerwony punkt to miejsce, w którym Jerzyk jest teraz. */
+const ROUTE_SEGMENTS=[
+  [[24,118],[90,118],[110,52],[190,62]],
+  [[190,62],[270,72],[300,132],[380,92]],
+  [[380,92],[420,72],[440,44],[452,34]]
+];
+function routePoint(fraction){
+  const t=Math.max(0,Math.min(1,fraction))*ROUTE_SEGMENTS.length;
+  const segment=Math.min(ROUTE_SEGMENTS.length-1,Math.floor(t));
+  const u=t-segment,[p0,p1,p2,p3]=ROUTE_SEGMENTS[segment],k=1-u;
+  return [0,1].map(axis=>k*k*k*p0[axis]+3*k*k*u*p1[axis]+3*k*u*u*p2[axis]+u*u*u*p3[axis]);
+}
+function renderRouteMini(){
+  const host=$('#routePoints'); if(!host||typeof JOURNEY_STOPS==='undefined')return;
+  const last=JOURNEY_STOPS.length-1, here=journeyIndex();
+  const NS='http://www.w3.org/2000/svg';
+  host.textContent='';
+  const dot=(point,radius,fill)=>{
+    const c=document.createElementNS(NS,'circle');
+    c.setAttribute('cx',point[0].toFixed(1));c.setAttribute('cy',point[1].toFixed(1));c.setAttribute('r',radius);
+    c.setAttribute('fill',fill);c.setAttribute('stroke','#0A1745');c.setAttribute('stroke-width','2.5');host.append(c);
+  };
+  const label=(point,text,anchor,below)=>{
+    const t=document.createElementNS(NS,'text');
+    t.setAttribute('x',point[0].toFixed(1));t.setAttribute('y',(point[1]+(below?28:-20)).toFixed(1));
+    t.setAttribute('text-anchor',anchor);t.setAttribute('font-family','Source Sans 3,sans-serif');
+    t.setAttribute('font-size','14');t.setAttribute('font-weight','600');t.setAttribute('fill','#4F6275');
+    t.textContent=text;host.append(t);
+  };
+  const at=index=>routePoint(index/last);
+  if(here<last){const near=at(here+1),cur=at(here);if(Math.hypot(near[0]-cur[0],near[1]-cur[1])>22) dot(near,8,'#FFFFFF');}
+  dot(at(last),9,'#0A1745');
+  dot(at(0),11,'#FFC629');
+  if(here>0&&here<last) dot(at(here),9,'#D1361D');
+  label(at(0),JOURNEY_STOPS[0].place,'start',true);
+  if(here>0&&here<last) label(at(here),JOURNEY_STOPS[here].place,'middle',at(here)[1]<48);
+  label(at(last),JOURNEY_STOPS[last].place,'end',true);
+  const now=JOURNEY_STOPS[here];
+  $('#routeCurrent').textContent='Przystanek '+(here+1)+': '+now.place;
+}
 function journeyIndex(){ return Math.min(JOURNEY_STOPS.length-1, S.passedExams.length); }
 
 /* ==================== POWTÓRKI DLA WZORCÓW I BŁĘDÓW ==================== */

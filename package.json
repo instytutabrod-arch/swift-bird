@@ -1,6 +1,6 @@
 {
   "name": "swift-bird",
-  "version": "16.4.0",
+  "version": "16.5.0",
   "private": true,
   "description": "Nauka angielskiego dla dzieci i dorosłych z orientacyjnym poziomowaniem CEFR i zadaniami Blooma",
   "main": "server.js",

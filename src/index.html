@@ -278,19 +278,32 @@
         </section>
 
         <section id="homeProgress" class="home-view" data-home-view="progress" role="region" aria-labelledby="homeNavProgress" hidden>
-          <div class="home-view-heading"><p class="eyebrow">Dowody nauki</p><h1>Postęp</h1><p>Tu widać, co już jest trwałe, co wymaga powtórki i jaki jest najbliższy cel.</p></div>
+          <div class="home-view-heading"><p class="eyebrow">Twoja nauka</p><h1>Postęp</h1><p>Tu widać, co już jest trwałe, co wymaga powtórki i jaki jest najbliższy cel.</p></div>
           <section id="progressEmpty" class="empty-state" hidden>
             <p class="empty-state-title">Tu pojawią się efekty Twojej nauki.</p>
             <p class="empty-state-copy">Po pierwszej krótkiej sesji zobaczysz wykonane próby, powtórki i kolejny cel.</p>
             <button id="progressEmptyAction" class="primary" type="button">Zacznij pierwszą sesję</button>
           </section>
           <section class="overview track-school-only" aria-label="Postępy">
-            <div><b id="allCollected">0</b><span>z 500 słów</span></div><div><b id="passedN">0</b><span>zdanych egzaminów</span></div><div><b id="openN">1</b><span>otwartych sekcji</span></div><div><b id="featherN">0</b><span>piórka</span></div><div><b id="badgeN">0</b><span>z 7 odznak</span></div>
+            <div class="stat-tile st-kobalt"><div class="stat-top"><b id="allCollected">0</b><i class="stat-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></i></div><span>z 500 słów</span></div>
+            <div class="stat-tile st-cynober"><div class="stat-top"><b id="passedN">0</b><i class="stat-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></i></div><span>zdanych egzaminów</span></div>
+            <div class="stat-tile st-zolc"><div class="stat-top"><b id="openN">0</b><i class="stat-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></i></div><span>otwartych sekcji</span></div>
+            <div class="stat-tile st-mieta"><div class="stat-top"><b id="featherN">0</b><i class="stat-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 4C10 4 5 10 5 18l-1 2 2-1c8 0 14-5 14-15z"/><path d="M9 15l7-7"/></svg></i></div><span>piórek</span></div>
+            <div class="stat-tile st-oberzynia"><div class="stat-top"><b id="badgeN">0</b><i class="stat-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 15.5l-4.7 2.45.9-5.23-3.8-3.7 5.25-.76Z"/></svg></i></div><span>z 7 odznak</span></div>
           </section>
+          <div class="progress-duo">
           <section class="level-home-card" aria-labelledby="levelHomeTitle">
-            <div class="level-home-main"><span id="homeCefrBadge" class="cefr-badge large">?</span><div><p class="eyebrow">Poziom startowy</p><h2 id="levelHomeTitle">Sprawdź, od czego zacząć</h2><p id="homeCefrSummary">Krótki test wskaże orientacyjny poziom A1–C2. Nie jest certyfikatem CEFR.</p></div></div>
+            <div class="level-home-main"><span id="homeCefrBadge" class="cefr-badge large">?</span><div><p class="eyebrow">Poziom startowy</p><h2 id="levelHomeTitle">Sprawdź, od czego zacząć</h2></div></div>
+            <p id="homeCefrSummary">Krótki test wskaże orientacyjny poziom A1–C2. Nie jest certyfikatem CEFR.</p>
             <div class="level-home-actions"><button id="openPlacement" class="primary" type="button">Zrób test poziomujący</button><button id="openLevelCenter" class="secondary" type="button">Poziom i plan nauki</button></div>
           </section>
+          <section class="journey-progress-card track-school-only" aria-labelledby="mapCardTitle">
+            <p class="eyebrow">25 przystanków</p><h2 id="mapCardTitle">Mapa wyprawy Jerzyka</h2>
+            <svg id="routeMini" viewBox="0 0 480 150" role="img" aria-label="Trasa lotu Jerzyka od Jerzykowa do Tasmanii"><path d="M24 118 C90 118 110 52 190 62 C270 72 300 132 380 92 C420 72 440 44 452 34" fill="none" stroke="#1E4FBF" stroke-width="3" stroke-dasharray="1 9" stroke-linecap="round"/><g id="routePoints"></g></svg>
+            <div class="journey-progress-foot"><span id="routeCurrent">Przystanek 1: Jerzykowo</span><button id="openMap" class="link-button" type="button">Otwórz mapę →</button></div>
+          </section>
+          </div>
+          <section class="home-badges track-school-only" aria-labelledby="homeBadgesTitle"><div class="home-badges-head"><div><p class="eyebrow">Osiągnięcia</p><h2 id="homeBadgesTitle">Odznaki Jerzyka</h2></div><strong id="homeBadgeCount">0 z 7 zdobytych</strong></div><p class="home-badges-copy">Pastelowa odznaka czeka na zdobycie, pełny kolor oznacza, że jest Twoja. Dotknij, żeby zobaczyć warunek albo przeczytać opowieść.</p><div id="homeBadgeList" class="badge-list home-badge-list"></div></section>
           <section id="adaptiveEvidenceCard" class="adaptive-evidence-card" aria-labelledby="adaptiveEvidenceTitle">
             <div class="adaptive-evidence-head">
               <div><p class="eyebrow">Profil oparty na wykonaniu</p><h2 id="adaptiveEvidenceTitle">Zadawanie pytań</h2></div>
@@ -308,8 +321,6 @@
               <div><b id="worldBloomN">0</b><span>własne wypowiedzi</span></div>
             </div>
           </section>
-          <button id="openMap" class="journey-progress-card track-school-only" type="button"><span><small>25 przystanków</small><strong>Mapa wyprawy Jerzyka</strong><em>Drugi przystanek: Warszawa</em></span><span aria-hidden="true">→</span></button>
-          <section class="home-badges track-school-only" aria-labelledby="homeBadgesTitle"><div class="home-badges-head"><div><p class="eyebrow">Osiągnięcia</p><h2 id="homeBadgesTitle">Odznaki Jerzyka</h2></div><strong id="homeBadgeCount">0 z 7 zdobytych</strong></div><p class="home-badges-copy">Dotknij odznaki, aby sprawdzić warunek i otworzyć dwujęzyczną opowieść.</p><div id="homeBadgeList" class="badge-list home-badge-list"></div></section>
         </section>
 
         <section id="homeProfile" class="home-view" data-home-view="profile" role="region" aria-labelledby="homeNavProfile" hidden>
