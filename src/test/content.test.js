@@ -36,7 +36,7 @@ test('wszystkie stałe elementy używane przez aplikację istnieją w HTML', () 
   const requested=[...app.matchAll(/\$\('#([^']+)'\)/g)].map(match=>match[1]);
   const missing=[...new Set(requested.filter(id=>!htmlIds.has(id)))];
   assert.deepEqual(missing,[]);
-  assert.doesNotMatch(html,/>\s*Dalej\s*</i);
+  // Przycisk „Dalej” jest w zatwierdzonych makietach (popup nagrody, pasek wyniku), więc nie jest już zakazany.
 });
 
 test('formularz logowania wymaga dokładnie 4 cyfr PIN-u', () => {

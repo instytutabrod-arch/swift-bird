@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '16.5';
+const APP_VERSION = '16.6';
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
@@ -2493,10 +2493,13 @@ function showNextBadge(){
   const badge = badgeQueue.shift();
   const modal = $('#badgeModal');
   if(!badge){ modal.hidden = true; return; }
-  $('#badgeBigIcon').innerHTML = '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(BADGE_ICON_SVG[badge.id]||'<circle cx="12" cy="12" r="8"/>')+'</svg>';
+  const accent = badgeAccent(BADGES.indexOf(badge));
+  const disc = $('#badgeBigIcon');
+  disc.style.background = accent.fill; disc.style.color = accent.ink;
+  disc.innerHTML = '<svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(BADGE_ICON_SVG[badge.id]||'<circle cx="12" cy="12" r="8"/>')+'</svg>';
   $('#badgeName').textContent = badge.name;
-  $('#badgeDesc').textContent = badge.desc;
-  $('#badgeReward').textContent = badge.reward || '';
+  const sentence = text => text ? text.charAt(0).toUpperCase()+text.slice(1)+(/[.!?]$/.test(text)?'':'.') : '';
+  $('#badgeDesc').textContent = [sentence(badge.desc),sentence(badge.reward)].filter(Boolean).join(' ');
   const story = $('#badgeStory');
   story.textContent = '';
   if(badge.story){
@@ -2512,7 +2515,7 @@ function showNextBadge(){
     story.append(listenEnglish);
   }
   story.hidden = true;
-  $('#badgeStoryButton').textContent = 'Przeczytaj historyjkę';
+  $('#badgeStoryButton').textContent = 'Przeczytaj opowieść';
   $('#badgeStoryButton').hidden = !badge.story;
   $('#badgeQueueNote').textContent = badgeQueue.length
     ? 'Czeka jeszcze ' + badgeQueue.length + (badgeQueue.length === 1 ? ' odznaka.' : ' odznaki.')
@@ -2531,7 +2534,7 @@ $('#badgeStoryButton').addEventListener('click',()=>{
   const story = $('#badgeStory');
   story.hidden = !story.hidden;
   if(story.hidden)stopSpeech();
-  $('#badgeStoryButton').textContent = story.hidden ? 'Przeczytaj historyjkę' : 'Zwiń historyjkę';
+  $('#badgeStoryButton').textContent = story.hidden ? 'Przeczytaj opowieść' : 'Zwiń opowieść';
 });
 $('#badgeRewardButton').addEventListener('click',()=>{
   stopSpeech();
