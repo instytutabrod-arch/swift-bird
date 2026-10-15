@@ -1898,3 +1898,56 @@ body.track-world .td-grid{grid-template-columns:minmax(0,1fr)}
 .modal-card{margin:auto}
 .modal-story .story-listen{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px;border:2px solid var(--kobalt);border-radius:99px;background:#fff;color:var(--kobalt);font-family:var(--display);font-weight:700;font-size:15px;box-shadow:none;margin:8px 0 0}
 .modal-story .story-listen:hover{background:var(--t-kobalt)}
+
+/* v16.7 Logowanie: dwa panele na komputerze, jedna kolumna na telefonie */
+#s-login.on{display:grid;grid-template-columns:1fr 1fr;min-height:100vh;padding:0;background:#fff}
+.login-hero{position:relative;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;gap:32px;padding:56px clamp(32px,4.5vw,64px);background:var(--kobalt);color:#fff}
+.login-brand{display:flex;align-items:center;gap:14px;font-family:var(--display);font-weight:700;font-size:2rem;line-height:1;letter-spacing:-.02em}
+.login-brand .login-bird-svg{width:46px;height:46px;flex:0 0 auto}
+.login-brand strong{font-weight:700}
+.login-hero-bird{position:absolute;right:-40px;top:150px;opacity:.14;pointer-events:none}
+.login-hero-bird .login-bird-svg{display:block;width:420px;height:420px}
+.login-hero-copy{position:relative}
+.login-hero-title{margin:0;max-width:560px;font-family:var(--display);font-weight:800;font-size:clamp(2.6rem,4.6vw,4.125rem);line-height:1.04;letter-spacing:-.02em}
+.login-hero-lead{margin:20px 0 0;max-width:480px;font-size:1.45rem;line-height:1.45;color:var(--t-kobalt)}
+.login-route{position:relative;max-width:560px}
+.login-route svg{display:block;width:100%;height:auto}
+.login-route-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.95rem;font-weight:600}
+.login-panel{display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:40px 24px;background:#fff}
+.login-card{width:min(100%,440px);display:flex;flex-direction:column;gap:20px;color:var(--ink)}
+.login-heading h1{margin:0;font-size:clamp(2rem,3vw,2.625rem);line-height:1.05;letter-spacing:-.02em;text-align:left}
+.login-heading .lead{margin:10px 0 0;font-size:1.125rem;line-height:1.5;color:var(--muted);text-align:left}
+#s-login .form-stack{gap:20px}
+#s-login .form-stack label{gap:8px;font-size:.95rem;font-weight:600;color:var(--muted)}
+#s-login .form-stack input{box-sizing:border-box;width:100%;height:58px;padding:0 18px;border:2px solid var(--line);border-radius:14px;background:#fff;color:var(--ink);font:400 1.1875rem var(--body)}
+#s-login .form-stack input::placeholder{color:var(--muted);opacity:.8}
+#s-login .form-stack input:focus{outline:none;border-color:var(--kobalt);box-shadow:0 0 0 3px var(--t-kobalt)}
+#s-login #loginPin{letter-spacing:6px}
+#s-login #loginPin::placeholder{letter-spacing:6px}
+#s-login .field-hint{font-size:.85rem;color:var(--muted)}
+#s-login .form-error{min-height:0;margin:-6px 0 0;color:var(--cynober-ink);font-weight:600}
+#s-login .form-error:empty{display:none}
+#s-login .primary{width:100%;height:58px;padding:0 28px;border:0;border-radius:14px;background:var(--kobalt);color:#fff;font:700 1.1875rem var(--display);letter-spacing:-.02em;box-shadow:none}
+#s-login .primary:hover{background:#1a45a8}
+#s-login .primary:active{transform:translateY(1px)}
+#s-login .login-links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px}
+#s-login .login-links .text-button{width:auto;min-height:44px;padding:0;margin:0;font-size:1rem;font-weight:600;color:var(--muted);background:none;border:0}
+#s-login .login-links #openRegister{color:var(--kobalt);text-decoration:underline;text-underline-offset:3px}
+#s-login .login-links .text-button[hidden]{display:none}
+#s-login .login-links #openAdminLogin{margin-left:auto}
+#s-login .version-label{margin:-4px 0 0;text-align:left;font-size:.8rem;color:var(--muted)}
+@media(max-width:900px){
+  #s-login.on{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .login-hero{gap:14px;padding:26px 22px 52px}
+  .login-brand{font-size:1.5rem;gap:11px}.login-brand .login-bird-svg{width:36px;height:36px}
+  .login-hero-bird{right:-60px;top:-10px}.login-hero-bird .login-bird-svg{width:220px;height:220px}
+  .login-hero-title{font-size:clamp(1.9rem,8vw,2.6rem)}
+  .login-hero-lead{margin-top:10px;font-size:1.05rem}
+  .login-route{display:none}
+  .login-panel{align-items:flex-start;margin-top:-26px;padding:28px 22px 22px;border-radius:26px 26px 0 0;position:relative}
+  .login-card{gap:18px}
+  .login-heading h1{font-size:1.9rem}
+  .login-heading .lead{font-size:1rem}
+  #s-login .form-stack{gap:16px}
+  #s-login .form-stack input,#s-login .primary{height:54px}
+}

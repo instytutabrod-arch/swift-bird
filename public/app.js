@@ -1,6 +1,7 @@
 'use strict';
 
-const APP_VERSION = '16.6';
+const APP_VERSION = '16.7';
+document.querySelectorAll('.version-label').forEach(el=>{el.textContent='Wersja '+APP_VERSION;});
 const DAY = 86400000;
 const STEPS = [1,2,4,8,16,35,70];
 const NEW_PER_SESSION = 4;
